@@ -23,11 +23,13 @@ Output:
 Maven namespace in this repo:
 - `io.github.masterjx9`
 
-Quick package commands:
-- Python: `cd bindings/python && python -m build`
-- JS/TS: `cd bindings/javascript && npm pack`
-- Java: `cd bindings/java && mvn package`
-- C++: `cd bindings/cpp && cmake -S . -B build && cmake --build build`
-- PHP: `composer install`
+Install commands:
+- Python: `pip install pp2p_core`
+- JS/TS: `npm i @pythonicit/pp2p-core-sdk`
+- Java (Maven): `io.github.masterjx9:pp2p-core-sdk:0.1.0`
+- PHP (Composer): `composer require masterjx9/pp2p-core-sdk`
+
+Runtime requirements (all SDKs):
+- Built/native PP2P core library present (`dist/pp2p_core/...`) or `PP2P_CORE_LIB` set to absolute library path.
 
 Each binding README has language-specific usage examples.

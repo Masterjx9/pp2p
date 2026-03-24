@@ -112,6 +112,26 @@ At `pp2p>` prompt:
 
 See `bindings/README.md`.
 
+## SDK Install Commands
+
+- Python: `pip install pp2p_core`
+- JavaScript/TypeScript: `npm i @pythonicit/pp2p-core-sdk`
+- Java (Maven): `io.github.masterjx9:pp2p-core-sdk:0.1.0`
+- PHP (Composer): `composer require masterjx9/pp2p-core-sdk`
+
+## SDK Runtime Requirements
+
+Required for all SDKs:
+- Native PP2P core library:
+  - Windows: `dist/pp2p_core/windows-x64/pp2p_core.dll`
+  - Linux: `dist/pp2p_core/linux-x64/libpp2p_core.so`
+  - macOS: `dist/pp2p_core/macos/libpp2p_core.dylib`
+- If library is elsewhere, set `PP2P_CORE_LIB` to absolute path.
+
+Extra requirements for the Python `pp2p.py` runtime CLI:
+- `pip install -r requirements.txt`
+- Onion mode requires an `onionrelay`/Tor binary (`--tor-bin`), built from this repo subset.
+
 ## Registry Publishing
 
 Maven Central namespace string used in this repo:

@@ -2,14 +2,18 @@
 
 Node.js FFI wrapper for the PP2P Rust core.
 
-## Install (local)
+## Install
 
 ```bash
-cd bindings/javascript
-npm install
+npm i @pythonicit/pp2p-core-sdk
 ```
 
-## Build native library first
+## Runtime requirements
+
+- Node.js 18+
+- Native PP2P core library (`pp2p_core.dll` / `libpp2p_core.so` / `libpp2p_core.dylib`)
+
+Build native library first:
 
 From repo root:
 
@@ -20,6 +24,8 @@ or on Windows:
 ```powershell
 .\scripts\build_pp2p_core.ps1
 ```
+
+If the library is not in `dist/pp2p_core/...`, set `PP2P_CORE_LIB` to its absolute path.
 
 ## Example
 

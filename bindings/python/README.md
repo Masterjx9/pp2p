@@ -2,7 +2,18 @@
 
 This package is a ctypes bridge over the PP2P Rust C ABI.
 
-## Build native library first
+## Install
+
+```bash
+pip install pp2p_core
+```
+
+## Runtime requirements
+
+- Python 3.9+
+- Native PP2P core library (`pp2p_core.dll` / `libpp2p_core.so` / `libpp2p_core.dylib`)
+
+Build native library first:
 
 Windows:
 ```powershell
@@ -14,10 +25,12 @@ Linux/macOS:
 ./scripts/build_pp2p_core_unix.sh
 ```
 
-## Install the Python SDK package (local)
+If the library is not in `dist/pp2p_core/...`, set `PP2P_CORE_LIB` to its absolute path.
 
-```powershell
-pip install -e .\bindings\python
+## Local dev install
+
+```bash
+pip install -e ./bindings/python
 ```
 
 ## Example
@@ -39,5 +52,3 @@ env = core.sign_envelope(
 core.verify_envelope(env, signer_public_key_b64=alice["public_key_b64"])
 print("ok")
 ```
-
-If the library is not in `dist/pp2p_core/...`, set `PP2P_CORE_LIB` to the absolute path.

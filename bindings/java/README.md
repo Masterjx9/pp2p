@@ -6,7 +6,22 @@ Maven module with JNA wrapper class:
 Namespace/groupId configured:
 - `io.github.masterjx9`
 
-## Build
+## Install (Maven)
+
+```xml
+<dependency>
+  <groupId>io.github.masterjx9</groupId>
+  <artifactId>pp2p-core-sdk</artifactId>
+  <version>0.1.0</version>
+</dependency>
+```
+
+## Runtime requirements
+
+- Java 11+
+- Native PP2P core library (`pp2p_core.dll` / `libpp2p_core.so` / `libpp2p_core.dylib`)
+
+## Build (local module)
 
 Build native core from repo root first:
 ```bash
