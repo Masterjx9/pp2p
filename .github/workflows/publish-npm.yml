@@ -30,6 +30,36 @@ jobs:
       - name: Verify package tarball
         run: npm pack --dry-run
 
-      - name: Publish package
+      - name: Check if version already published
+        id: meta
+        run: |
+          NAME=$(node -p "require('./package.json').name")
+          VERSION=$(node -p "require('./package.json').version")
+          echo "name=$NAME" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          if npm view "$NAME@$VERSION" version >/dev/null 2>&1; then
+            echo "already_published=true" >> "$GITHUB_OUTPUT"
+            echo "Version already exists on npm; skipping publish."
+          else
+            echo "already_published=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Publish package (trusted publisher)
+        id: publish_trusted
+        if: steps.meta.outputs.already_published != 'true'
+        continue-on-error: true
         run: |
           npm publish --access public --provenance
+
+      - name: Publish package (token fallback)
+        if: steps.meta.outputs.already_published != 'true' && steps.publish_trusted.outcome == 'failure' && secrets.NPM_ACCESS_TOKEN != ''
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_ACCESS_TOKEN }}
+        run: |
+          npm publish --access public --provenance
+
+      - name: Fail if publish did not succeed
+        if: steps.meta.outputs.already_published != 'true' && steps.publish_trusted.outcome == 'failure' && secrets.NPM_ACCESS_TOKEN == ''
+        run: |
+          echo "npm trusted publish failed and NPM_ACCESS_TOKEN fallback secret is not configured."
+          exit 1
