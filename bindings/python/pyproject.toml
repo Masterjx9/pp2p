@@ -22,4 +22,4 @@ packages = ["pp2p_core", "pp2p_core.native"]
 
 [tool.setuptools.package-data]
 pp2p_core = ["native/*", "native/*/*"]
-pp2p_core.native = ["*", "*/*"]
+"pp2p_core.native" = ["*", "*/*"]
