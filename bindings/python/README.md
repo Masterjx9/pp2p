@@ -27,12 +27,6 @@ Linux/macOS:
 
 If the library is not in `dist/pp2p_core/...`, set `PP2P_CORE_LIB` to its absolute path.
 
-## Local dev install
-
-```bash
-pip install -e ./bindings/python
-```
-
 ## Example
 
 ```python
