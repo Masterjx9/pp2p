@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pp2p_core"
-version = "0.1.1"
+version = "0.2.0"
 description = "Python ctypes SDK for the PP2P Rust core"
 readme = "README.md"
 requires-python = ">=3.9"
@@ -17,4 +17,9 @@ classifiers = [
 ]
 
 [tool.setuptools]
-py-modules = ["pp2p_core"]
+include-package-data = true
+packages = ["pp2p_core", "pp2p_core.native"]
+
+[tool.setuptools.package-data]
+pp2p_core = ["native/*", "native/*/*"]
+pp2p_core.native = ["*", "*/*"]

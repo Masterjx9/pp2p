@@ -38,9 +38,17 @@ release/
 *.zip
 bindings/javascript/node_modules/
 bindings/javascript/package-lock.json
+bindings/javascript/native/*
+!bindings/javascript/native/.gitkeep
 bindings/python/*.egg-info/
 bindings/python/build/
 bindings/python/dist/
+bindings/python/pp2p_core/native/**
+!bindings/python/pp2p_core/native/__init__.py
+!bindings/python/pp2p_core/native/.gitkeep
+bindings/python_legacy/*.egg-info/
+bindings/python_legacy/build/
+bindings/python_legacy/dist/
 bindings/java/target/
 bindings/php/vendor/
 bindings/cpp/build/

@@ -46,7 +46,7 @@ This repo is now structured as:
 - `include/pp2p_core.h`: shared ABI contract
 
 ### Python runtime integration
-`pp2p.py` uses `bindings/python/pp2p_core.py` for:
+`pp2p.py` uses `bindings/python/pp2p_core/` for:
 - identity generation/loading
 - envelope signing
 - envelope verification
@@ -122,12 +122,15 @@ See `bindings/README.md`.
 
 ## SDK Runtime Requirements
 
-Required for all SDKs:
-- Native PP2P core library:
-  - Windows: `dist/pp2p_core/windows-x64/pp2p_core.dll`
-  - Linux: `dist/pp2p_core/linux-x64/libpp2p_core.so`
-  - macOS: `dist/pp2p_core/macos/libpp2p_core.dylib`
-- If library is elsewhere, set `PP2P_CORE_LIB` to absolute path.
+Python / JS SDKs:
+- `pip install pp2p_core` and `npm i @pythonicit/pp2p-core-sdk` include bundled native binaries for:
+  - Windows x64
+  - Linux x64
+  - macOS Intel (x64)
+  - macOS Apple Silicon (arm64)
+
+Java / PHP / C++ SDKs:
+- Require explicit native library path for now (`PP2P_CORE_LIB` or constructor path).
 
 Extra requirements for the Python `pp2p.py` runtime CLI:
 - `pip install -r requirements.txt`

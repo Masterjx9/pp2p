@@ -1,6 +1,6 @@
 {
   "name": "@pythonicit/pp2p-core-sdk",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Node.js SDK for the PP2P Rust core C ABI",
   "main": "pp2p_core.js",
   "types": "pp2p_core.d.ts",
@@ -12,10 +12,21 @@
     "rust"
   ],
   "engines": {
-    "node": ">=18"
+    "node": ">=18 <=22"
+  },
+  "scripts": {
+    "postinstall": "node scripts/postinstall.js"
   },
   "dependencies": {
     "ffi-napi": "^4.0.3",
     "ref-napi": "^3.0.3"
-  }
+  },
+  "files": [
+    "README.md",
+    "package.json",
+    "pp2p_core.js",
+    "pp2p_core.d.ts",
+    "scripts/postinstall.js",
+    "native/**/*"
+  ]
 }

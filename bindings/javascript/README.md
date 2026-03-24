@@ -11,21 +11,13 @@ npm i @pythonicit/pp2p-core-sdk
 ## Runtime requirements
 
 - Node.js 18+
-- Native PP2P core library (`pp2p_core.dll` / `libpp2p_core.so` / `libpp2p_core.dylib`)
+- Supported bundled-native targets:
+  - Windows x64
+  - Linux x64
+  - macOS Intel (x64)
+  - macOS Apple Silicon (arm64)
 
-Build native library first:
-
-From repo root:
-
-```bash
-./scripts/build_pp2p_core_unix.sh
-```
-or on Windows:
-```powershell
-.\scripts\build_pp2p_core.ps1
-```
-
-If the library is not in `dist/pp2p_core/...`, set `PP2P_CORE_LIB` to its absolute path.
+For unsupported targets, set `PP2P_CORE_LIB` to a compatible native library path.
 
 ## Example
 

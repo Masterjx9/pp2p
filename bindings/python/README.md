@@ -11,21 +11,13 @@ pip install pp2p_core
 ## Runtime requirements
 
 - Python 3.9+
-- Native PP2P core library (`pp2p_core.dll` / `libpp2p_core.so` / `libpp2p_core.dylib`)
+- Supported bundled-native targets:
+  - Windows x64
+  - Linux x64
+  - macOS Intel (x64)
+  - macOS Apple Silicon (arm64)
 
-Build native library first:
-
-Windows:
-```powershell
-.\scripts\build_pp2p_core.ps1
-```
-
-Linux/macOS:
-```bash
-./scripts/build_pp2p_core_unix.sh
-```
-
-If the library is not in `dist/pp2p_core/...`, set `PP2P_CORE_LIB` to its absolute path.
+For unsupported targets, set `PP2P_CORE_LIB` to a compatible native library path.
 
 ## Example
 

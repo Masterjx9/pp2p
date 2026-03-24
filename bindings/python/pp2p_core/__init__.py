@@ -12,11 +12,50 @@ import time
 from typing import Any
 
 
+def _platform_lib_name() -> str:
+    if os.name == "nt":
+        return "pp2p_core.dll"
+    if os.uname().sysname == "Darwin":
+        return "libpp2p_core.dylib"
+    return "libpp2p_core.so"
+
+
+def _platform_native_dir() -> str | None:
+    arch = os.uname().machine.lower() if os.name != "nt" else os.environ.get("PROCESSOR_ARCHITECTURE", "").lower()
+    if os.name == "nt":
+        if "64" in arch:
+            return "win32-x64"
+        return None
+    if os.uname().sysname == "Darwin":
+        if arch in {"arm64", "aarch64"}:
+            return "darwin-arm64"
+        if arch in {"x86_64", "amd64"}:
+            return "darwin-x64"
+        return None
+    if arch in {"x86_64", "amd64"}:
+        return "linux-x64"
+    return None
+
+
 def _default_library_path() -> str:
     env = os.environ.get("PP2P_CORE_LIB")
     if env:
         return env
 
+    lib_name = _platform_lib_name()
+    here = pathlib.Path(__file__).resolve().parent
+
+    # Preferred: bundled library inside wheel.
+    native_dir = _platform_native_dir()
+    bundled = here / "native" / native_dir / lib_name if native_dir else here / "native" / lib_name
+    if bundled.exists():
+        return str(bundled)
+
+    legacy_bundled = here / "native" / lib_name
+    if legacy_bundled.exists():
+        return str(legacy_bundled)
+
+    # Fallback for local source-tree runs.
     if os.name == "nt":
         rel = pathlib.Path("dist") / "pp2p_core" / "windows-x64" / "pp2p_core.dll"
     elif os.uname().sysname == "Darwin":
@@ -25,15 +64,15 @@ def _default_library_path() -> str:
         rel = pathlib.Path("dist") / "pp2p_core" / "linux-x64" / "libpp2p_core.so"
 
     candidates = [
-        pathlib.Path(__file__).resolve().parents[2] / rel,
+        pathlib.Path(__file__).resolve().parents[3] / rel,
         pathlib.Path.cwd() / rel,
     ]
     for candidate in candidates:
         if candidate.exists():
             return str(candidate)
 
-    # Return best-guess path so ctypes error mentions a useful location.
-    return str(candidates[0])
+    # Return best-guess bundled path so ctypes emits a useful file-not-found.
+    return str(bundled)
 
 
 class Pp2pCoreError(RuntimeError):

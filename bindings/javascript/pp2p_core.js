@@ -1,7 +1,5 @@
 /*
  * Node.js bridge for the Rust PP2P C ABI.
- * Requires:
- *   npm i ffi-napi ref-napi
  */
 
 const ffi = require("ffi-napi");
@@ -14,14 +12,25 @@ function defaultLibPath() {
     return process.env.PP2P_CORE_LIB;
   }
 
-  let rel = null;
-  if (process.platform === "win32") {
-    rel = "dist/pp2p_core/windows-x64/pp2p_core.dll";
-  } else if (process.platform === "darwin") {
-    rel = "dist/pp2p_core/macos/libpp2p_core.dylib";
-  } else {
-    rel = "dist/pp2p_core/linux-x64/libpp2p_core.so";
+  let bundled = null;
+  if (process.platform === "win32" && process.arch === "x64") {
+    bundled = path.resolve(__dirname, "native", "win32-x64", "pp2p_core.dll");
+  } else if (process.platform === "darwin" && process.arch === "x64") {
+    bundled = path.resolve(__dirname, "native", "darwin-x64", "libpp2p_core.dylib");
+  } else if (process.platform === "darwin" && process.arch === "arm64") {
+    bundled = path.resolve(__dirname, "native", "darwin-arm64", "libpp2p_core.dylib");
+  } else if (process.platform === "linux" && process.arch === "x64") {
+    bundled = path.resolve(__dirname, "native", "linux-x64", "libpp2p_core.so");
   }
+
+  if (bundled && fs.existsSync(bundled)) {
+    return bundled;
+  }
+
+  let rel = null;
+  if (process.platform === "win32") rel = "dist/pp2p_core/windows-x64/pp2p_core.dll";
+  else if (process.platform === "darwin") rel = "dist/pp2p_core/macos/libpp2p_core.dylib";
+  else rel = "dist/pp2p_core/linux-x64/libpp2p_core.so";
 
   const candidates = [
     path.resolve(process.cwd(), rel),
@@ -32,7 +41,10 @@ function defaultLibPath() {
       return candidate;
     }
   }
-  return candidates[0];
+  throw new Error(
+    `PP2P native library not found for ${process.platform}/${process.arch}. ` +
+      `Set PP2P_CORE_LIB or install a package build that includes native binaries.`
+  );
 }
 
 class Pp2pCore {

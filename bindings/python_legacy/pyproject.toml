@@ -4,13 +4,13 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pp2p-core-sdk"
-version = "0.1.1"
+version = "0.2.0"
 description = "Deprecated compatibility package. Use pp2p_core."
 readme = "README.md"
 requires-python = ">=3.9"
 authors = [{ name = "PP2P" }]
 license = "MIT"
-dependencies = ["pp2p_core>=0.1.1"]
+dependencies = ["pp2p_core>=0.2.0"]
 classifiers = [
   "Programming Language :: Python :: 3",
   "Programming Language :: Python :: 3 :: Only",

@@ -10,7 +10,119 @@ on:
       - main
 
 jobs:
+  preflight:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      publish_needed: ${{ steps.check.outputs.publish_needed }}
+      version: ${{ steps.meta.outputs.version }}
+
+    defaults:
+      run:
+        working-directory: bindings/javascript
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Read package metadata
+        id: meta
+        run: |
+          echo "name=$(node -p "require('./package.json').name")" >> "$GITHUB_OUTPUT"
+          echo "version=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
+
+      - name: Check if version is already on npm
+        id: check
+        run: |
+          NAME=$(node -p "require('./package.json').name")
+          VERSION=$(node -p "require('./package.json').version")
+          if npm view "$NAME@$VERSION" version >/dev/null 2>&1; then
+            echo "publish_needed=false" >> "$GITHUB_OUTPUT"
+            echo "Version $NAME@$VERSION already published."
+          else
+            echo "publish_needed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  build_native:
+    needs: preflight
+    if: needs.preflight.outputs.publish_needed == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-2022
+            artifact: win32-x64
+          - os: ubuntu-22.04
+            artifact: linux-x64
+          - os: macos-13
+            artifact: darwin-x64
+          - os: macos-14
+            artifact: darwin-arm64
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build native core (Windows)
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: .\scripts\build_pp2p_core.ps1
+
+      - name: Build native core (Linux/macOS)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          chmod +x scripts/build_pp2p_core_unix.sh
+          ./scripts/build_pp2p_core_unix.sh
+
+      - name: Stage native artifact (Windows)
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: |
+          New-Item -ItemType Directory -Force -Path native\win32-x64 | Out-Null
+          Copy-Item dist\pp2p_core\windows-x64\pp2p_core.dll native\win32-x64\pp2p_core.dll -Force
+
+      - name: Stage native artifact (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          mkdir -p native/linux-x64
+          cp -f dist/pp2p_core/linux-x64/libpp2p_core.so native/linux-x64/libpp2p_core.so
+
+      - name: Stage native artifact (macOS Intel)
+        if: matrix.artifact == 'darwin-x64'
+        shell: bash
+        run: |
+          mkdir -p native/darwin-x64
+          cp -f dist/pp2p_core/macos/libpp2p_core.dylib native/darwin-x64/libpp2p_core.dylib
+
+      - name: Stage native artifact (macOS ARM64)
+        if: matrix.artifact == 'darwin-arm64'
+        shell: bash
+        run: |
+          mkdir -p native/darwin-arm64
+          cp -f dist/pp2p_core/macos/libpp2p_core.dylib native/darwin-arm64/libpp2p_core.dylib
+
+      - name: Upload native artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: npm-native-${{ matrix.artifact }}
+          path: native/**
+
   publish:
+    needs: [preflight, build_native]
+    if: needs.preflight.outputs.publish_needed == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -30,24 +142,24 @@ jobs:
           node-version: "20"
           registry-url: "https://registry.npmjs.org"
 
+      - name: Download native artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: npm-native-*
+          merge-multiple: true
+          path: bindings/javascript
+
       - name: Verify package tarball
         run: npm pack --dry-run
 
       - name: Publish package
         run: |
-          NAME=$(node -p "require('./package.json').name")
-          VERSION=$(node -p "require('./package.json').version")
-
-          if npm view "$NAME@$VERSION" version >/dev/null 2>&1; then
-            echo "Version $NAME@$VERSION already published; skipping."
-            exit 0
-          fi
-
           unset NODE_AUTH_TOKEN
-          if npm publish --access public --provenance; then
-            echo "Published via trusted publisher."
-            exit 0
-          fi
+          npm publish --access public --provenance
 
-          echo "Trusted publish failed."
-          exit 1
+  skip:
+    needs: preflight
+    if: needs.preflight.outputs.publish_needed != 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "Version already exists on npm; skipping publish."

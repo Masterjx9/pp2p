@@ -14,7 +14,7 @@ Output:
 
 ## SDK packages
 
-- Python: `bindings/python` (`pyproject.toml`, module `pp2p_core.py`)
+- Python: `bindings/python` (`pyproject.toml`, package `pp2p_core/`)
 - JavaScript/TypeScript: `bindings/javascript` (`package.json`)
 - Java: `bindings/java` (`pom.xml`, JNA wrapper)
 - C++: `bindings/cpp` (`CMakeLists.txt`, wrapper static lib)
@@ -30,6 +30,11 @@ Install commands:
 - PHP (Composer): `composer require masterjx9/pp2p-core-sdk`
 
 Runtime requirements (all SDKs):
-- Built/native PP2P core library present (`dist/pp2p_core/...`) or `PP2P_CORE_LIB` set to absolute library path.
+- Python/JS packages bundle native binaries for:
+  - Windows x64
+  - Linux x64
+  - macOS Intel (x64)
+  - macOS Apple Silicon (arm64)
+- Java/PHP/C++ currently require a native library path (`PP2P_CORE_LIB` or explicit path argument).
 
 Each binding README has language-specific usage examples.
