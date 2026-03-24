@@ -118,30 +118,30 @@ jobs:
         if: runner.os == 'Windows'
         shell: powershell
         run: |
-          New-Item -ItemType Directory -Force -Path native\win32-x64 | Out-Null
-          Copy-Item dist\pp2p_core\windows-x64\pp2p_core.dll native\win32-x64\pp2p_core.dll -Force
+          New-Item -ItemType Directory -Force -Path out\win32-x64 | Out-Null
+          Copy-Item dist\pp2p_core\windows-x64\pp2p_core.dll out\win32-x64\pp2p_core.dll -Force
 
       - name: Stage bundled native library (Linux)
         if: runner.os == 'Linux'
         shell: bash
         run: |
-          mkdir -p native/linux-x64
-          cp -f dist/pp2p_core/linux-x64/libpp2p_core.so native/linux-x64/libpp2p_core.so
+          mkdir -p out/linux-x64
+          cp -f dist/pp2p_core/linux-x64/libpp2p_core.so out/linux-x64/libpp2p_core.so
 
       - name: Stage bundled native library (macOS universal)
         if: runner.os == 'macOS'
         shell: bash
         run: |
-          mkdir -p native/darwin-x64
-          mkdir -p native/darwin-arm64
-          cp -f rust/target/x86_64-apple-darwin/release/libpp2p_ffi.dylib native/darwin-x64/libpp2p_core.dylib
-          cp -f rust/target/aarch64-apple-darwin/release/libpp2p_ffi.dylib native/darwin-arm64/libpp2p_core.dylib
+          mkdir -p out/darwin-x64
+          mkdir -p out/darwin-arm64
+          cp -f rust/target/x86_64-apple-darwin/release/libpp2p_ffi.dylib out/darwin-x64/libpp2p_core.dylib
+          cp -f rust/target/aarch64-apple-darwin/release/libpp2p_ffi.dylib out/darwin-arm64/libpp2p_core.dylib
 
       - name: Upload native artifact
         uses: actions/upload-artifact@v4
         with:
           name: python-native-${{ matrix.artifact }}
-          path: native/**
+          path: out/**
 
   publish:
     needs: [preflight, build_native]
@@ -164,7 +164,20 @@ jobs:
         with:
           pattern: python-native-*
           merge-multiple: true
-          path: bindings/python/pp2p_core
+          path: tmp_native
+
+      - name: Stage downloaded native payload
+        shell: bash
+        run: |
+          mkdir -p bindings/python/pp2p_core/native/win32-x64
+          mkdir -p bindings/python/pp2p_core/native/linux-x64
+          mkdir -p bindings/python/pp2p_core/native/darwin-x64
+          mkdir -p bindings/python/pp2p_core/native/darwin-arm64
+
+          cp -f tmp_native/win32-x64/pp2p_core.dll bindings/python/pp2p_core/native/win32-x64/pp2p_core.dll
+          cp -f tmp_native/linux-x64/libpp2p_core.so bindings/python/pp2p_core/native/linux-x64/libpp2p_core.so
+          cp -f tmp_native/darwin-x64/libpp2p_core.dylib bindings/python/pp2p_core/native/darwin-x64/libpp2p_core.dylib
+          cp -f tmp_native/darwin-arm64/libpp2p_core.dylib bindings/python/pp2p_core/native/darwin-arm64/libpp2p_core.dylib
 
       - name: Build wheel + sdist
         run: |
