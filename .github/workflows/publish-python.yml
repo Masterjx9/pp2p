@@ -174,10 +174,14 @@ jobs:
           mkdir -p bindings/python/pp2p_core/native/darwin-x64
           mkdir -p bindings/python/pp2p_core/native/darwin-arm64
 
-          cp -f tmp_native/win32-x64/pp2p_core.dll bindings/python/pp2p_core/native/win32-x64/pp2p_core.dll
-          cp -f tmp_native/linux-x64/libpp2p_core.so bindings/python/pp2p_core/native/linux-x64/libpp2p_core.so
-          cp -f tmp_native/darwin-x64/libpp2p_core.dylib bindings/python/pp2p_core/native/darwin-x64/libpp2p_core.dylib
-          cp -f tmp_native/darwin-arm64/libpp2p_core.dylib bindings/python/pp2p_core/native/darwin-arm64/libpp2p_core.dylib
+          cp -f tmp_native/win32-x64/pp2p_core.dll bindings/python/pp2p_core/native/win32-x64/pp2p_core.dll || \
+            cp -f tmp_native/out/win32-x64/pp2p_core.dll bindings/python/pp2p_core/native/win32-x64/pp2p_core.dll
+          cp -f tmp_native/linux-x64/libpp2p_core.so bindings/python/pp2p_core/native/linux-x64/libpp2p_core.so || \
+            cp -f tmp_native/out/linux-x64/libpp2p_core.so bindings/python/pp2p_core/native/linux-x64/libpp2p_core.so
+          cp -f tmp_native/darwin-x64/libpp2p_core.dylib bindings/python/pp2p_core/native/darwin-x64/libpp2p_core.dylib || \
+            cp -f tmp_native/out/darwin-x64/libpp2p_core.dylib bindings/python/pp2p_core/native/darwin-x64/libpp2p_core.dylib
+          cp -f tmp_native/darwin-arm64/libpp2p_core.dylib bindings/python/pp2p_core/native/darwin-arm64/libpp2p_core.dylib || \
+            cp -f tmp_native/out/darwin-arm64/libpp2p_core.dylib bindings/python/pp2p_core/native/darwin-arm64/libpp2p_core.dylib
 
       - name: Build wheel + sdist
         run: |

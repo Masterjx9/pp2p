@@ -158,10 +158,14 @@ jobs:
           mkdir -p bindings/javascript/native/darwin-x64
           mkdir -p bindings/javascript/native/darwin-arm64
 
-          cp -f tmp_native/win32-x64/pp2p_core.dll bindings/javascript/native/win32-x64/pp2p_core.dll
-          cp -f tmp_native/linux-x64/libpp2p_core.so bindings/javascript/native/linux-x64/libpp2p_core.so
-          cp -f tmp_native/darwin-x64/libpp2p_core.dylib bindings/javascript/native/darwin-x64/libpp2p_core.dylib
-          cp -f tmp_native/darwin-arm64/libpp2p_core.dylib bindings/javascript/native/darwin-arm64/libpp2p_core.dylib
+          cp -f tmp_native/win32-x64/pp2p_core.dll bindings/javascript/native/win32-x64/pp2p_core.dll || \
+            cp -f tmp_native/out/win32-x64/pp2p_core.dll bindings/javascript/native/win32-x64/pp2p_core.dll
+          cp -f tmp_native/linux-x64/libpp2p_core.so bindings/javascript/native/linux-x64/libpp2p_core.so || \
+            cp -f tmp_native/out/linux-x64/libpp2p_core.so bindings/javascript/native/linux-x64/libpp2p_core.so
+          cp -f tmp_native/darwin-x64/libpp2p_core.dylib bindings/javascript/native/darwin-x64/libpp2p_core.dylib || \
+            cp -f tmp_native/out/darwin-x64/libpp2p_core.dylib bindings/javascript/native/darwin-x64/libpp2p_core.dylib
+          cp -f tmp_native/darwin-arm64/libpp2p_core.dylib bindings/javascript/native/darwin-arm64/libpp2p_core.dylib || \
+            cp -f tmp_native/out/darwin-arm64/libpp2p_core.dylib bindings/javascript/native/darwin-arm64/libpp2p_core.dylib
 
       - name: Verify package tarball
         run: npm pack --dry-run

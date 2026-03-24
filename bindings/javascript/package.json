@@ -1,6 +1,6 @@
 {
   "name": "@pythonicit/pp2p-core-sdk",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Node.js SDK for the PP2P Rust core C ABI",
   "main": "pp2p_core.js",
   "types": "pp2p_core.d.ts",
