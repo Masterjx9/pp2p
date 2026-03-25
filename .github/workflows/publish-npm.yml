@@ -297,25 +297,8 @@ jobs:
 
       - name: Publish package
         working-directory: bindings/javascript
-        env:
-          NPM_ACCESS_TOKEN: ${{ secrets.NPM_ACCESS_TOKEN }}
         run: |
-          set +e
           npm publish --access public --provenance
-          rc=$?
-          if [ $rc -eq 0 ]; then
-            exit 0
-          fi
-
-          echo "OIDC publish failed with exit code ${rc}."
-          if [ -z "${NPM_ACCESS_TOKEN}" ]; then
-            echo "NPM_ACCESS_TOKEN is not set; cannot run fallback publish." >&2
-            exit $rc
-          fi
-
-          echo "Retrying publish with NPM_ACCESS_TOKEN fallback..."
-          printf '//registry.npmjs.org/:_authToken=%s\n' "${NPM_ACCESS_TOKEN}" > "${HOME}/.npmrc"
-          npm publish --access public
 
   skip:
     needs: preflight
