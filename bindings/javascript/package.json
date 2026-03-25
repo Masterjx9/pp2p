@@ -1,6 +1,6 @@
 {
   "name": "@pythonicit/p4-core-sdk",
-  "version": "0.2.2",
+  "version": "0.2.5",
   "description": "Node.js SDK for the P4 Rust core C ABI",
   "main": "p4_core.js",
   "types": "p4_core.d.ts",
@@ -27,8 +27,7 @@
     "p4_core.js",
     "p4_core.d.ts",
     "scripts/postinstall.js",
-    "native/**/*"
+    "native/**/*",
+    "onionrelay/**/*"
   ]
 }
-
-

@@ -29,3 +29,5 @@ export class P4Core {
   verifyEnvelope(input: VerifyEnvelopeInput): boolean;
 }
 
+export function resolveOnionrelayPath(pathOverride?: string): string;
+

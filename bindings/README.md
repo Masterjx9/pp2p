@@ -26,16 +26,18 @@ Maven namespace in this repo:
 Install commands:
 - Python: `pip install p4_core`
 - JS/TS: `npm i @pythonicit/p4-core-sdk`
-- Java (Maven): `io.github.masterjx9:p4-core-sdk:0.2.0`
+- Java (Maven): `io.github.masterjx9:p4-core-sdk:0.2.1`
 - PHP (Composer): `composer require masterjx9/p4-core-sdk`
 
 Runtime requirements (all SDKs):
-- Python/JS/Java/PHP packages bundle native binaries for:
+- Python/JS/Java packages bundle native core + runtime transport for:
   - Windows x64
   - Linux x64
   - macOS Intel (x64)
   - macOS Apple Silicon (arm64)
-- C++ auto-resolves bundled native binaries from `native/p4_core/<platform>/`.
+- PHP/C++ auto-resolve bundled runtime files from:
+  - `native/p4_core/<platform>/`
+  - transport runtime package payload
 - Any SDK can be overridden with `P4_CORE_LIB`.
 
 Each binding README has language-specific usage examples.

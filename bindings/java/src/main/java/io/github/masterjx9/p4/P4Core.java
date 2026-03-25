@@ -14,6 +14,7 @@ import java.util.Objects;
 
 public final class P4Core {
     private static final String ENV_LIBRARY_PATH = "P4_CORE_LIB";
+    private static final String ENV_ONIONRELAY_PATH = "P4_ONIONRELAY_BIN";
 
     private interface NativeApi extends Library {
         Pointer p4_generate_identity_json();
@@ -117,8 +118,8 @@ public final class P4Core {
         }
 
         PlatformTarget target = PlatformTarget.detect();
-        String resourcePath = "/native/p4_core/" + target.nativeDir + "/" + target.fileName;
-        String bundledPath = extractBundledLibrary(resourcePath, target.fileName);
+        String resourcePath = "/native/p4_core/" + target.nativeDir + "/" + target.coreFileName;
+        String bundledPath = extractBundledFile(resourcePath, target.coreFileName);
         if (bundledPath != null) {
             return bundledPath;
         }
@@ -128,31 +129,60 @@ public final class P4Core {
             "native",
             "p4_core",
             target.nativeDir,
-            target.fileName
+            target.coreFileName
         );
         if (Files.exists(repoNative)) {
             return repoNative.toAbsolutePath().toString();
         }
 
         throw new RuntimeException(
-            "P⁴ native library not found for " + target.osLabel + "/" + target.archLabel +
+            "P4 native library not found for " + target.osLabel + "/" + target.archLabel +
             ". Set P4_CORE_LIB or use a build that includes bundled native binaries."
         );
     }
 
-    private static String extractBundledLibrary(String resourcePath, String fileName) {
+    public static String resolveOnionrelayPath() {
+        String envPath = System.getenv(ENV_ONIONRELAY_PATH);
+        if (envPath != null && !envPath.isBlank()) {
+            return envPath;
+        }
+
+        PlatformTarget target = PlatformTarget.detect();
+        String resourcePath = "/onionrelay/" + target.nativeDir + "/" + target.onionrelayFileName;
+        String bundledPath = extractBundledFile(resourcePath, target.onionrelayFileName);
+        if (bundledPath != null) {
+            return bundledPath;
+        }
+
+        Path repoOnionrelay = Path.of(
+            System.getProperty("user.dir"),
+            "onionrelay",
+            target.nativeDir,
+            target.onionrelayFileName
+        );
+        if (Files.exists(repoOnionrelay)) {
+            return repoOnionrelay.toAbsolutePath().toString();
+        }
+
+        throw new RuntimeException(
+            "P4 onionrelay runtime not found for " + target.osLabel + "/" + target.archLabel +
+            ". Set P4_ONIONRELAY_BIN or use a build that includes bundled onionrelay."
+        );
+    }
+
+    private static String extractBundledFile(String resourcePath, String fileName) {
         try (InputStream input = P4Core.class.getResourceAsStream(resourcePath)) {
             if (input == null) {
                 return null;
             }
             Path tempDir = Files.createTempDirectory("p4-core-jna-");
-            Path tempLib = tempDir.resolve(fileName);
-            Files.copy(input, tempLib, StandardCopyOption.REPLACE_EXISTING);
-            tempLib.toFile().deleteOnExit();
+            Path tempFile = tempDir.resolve(fileName);
+            Files.copy(input, tempFile, StandardCopyOption.REPLACE_EXISTING);
+            tempFile.toFile().deleteOnExit();
             tempDir.toFile().deleteOnExit();
-            return tempLib.toAbsolutePath().toString();
+            return tempFile.toAbsolutePath().toString();
         } catch (IOException e) {
-            throw new RuntimeException("Failed to extract bundled native library: " + e.getMessage(), e);
+            throw new RuntimeException("Failed to extract bundled file: " + e.getMessage(), e);
         }
     }
 
@@ -160,13 +190,21 @@ public final class P4Core {
         private final String osLabel;
         private final String archLabel;
         private final String nativeDir;
-        private final String fileName;
+        private final String coreFileName;
+        private final String onionrelayFileName;
 
-        private PlatformTarget(String osLabel, String archLabel, String nativeDir, String fileName) {
+        private PlatformTarget(
+            String osLabel,
+            String archLabel,
+            String nativeDir,
+            String coreFileName,
+            String onionrelayFileName
+        ) {
             this.osLabel = osLabel;
             this.archLabel = archLabel;
             this.nativeDir = nativeDir;
-            this.fileName = fileName;
+            this.coreFileName = coreFileName;
+            this.onionrelayFileName = onionrelayFileName;
         }
 
         private static PlatformTarget detect() {
@@ -174,23 +212,21 @@ public final class P4Core {
             String arch = System.getProperty("os.arch", "").toLowerCase(Locale.ROOT);
             if (os.contains("win")) {
                 if (arch.contains("64")) {
-                    return new PlatformTarget("windows", arch, "win32-x64", "p4_core.dll");
+                    return new PlatformTarget("windows", arch, "win32-x64", "p4_core.dll", "onionrelay.exe");
                 }
             } else if (os.contains("mac") || os.contains("darwin")) {
                 if (arch.contains("aarch64") || arch.contains("arm64")) {
-                    return new PlatformTarget("darwin", arch, "darwin-arm64", "libp4_core.dylib");
+                    return new PlatformTarget("darwin", arch, "darwin-arm64", "libp4_core.dylib", "onionrelay");
                 }
                 if (arch.contains("x86_64") || arch.contains("amd64")) {
-                    return new PlatformTarget("darwin", arch, "darwin-x64", "libp4_core.dylib");
+                    return new PlatformTarget("darwin", arch, "darwin-x64", "libp4_core.dylib", "onionrelay");
                 }
             } else if (os.contains("linux")) {
                 if (arch.contains("x86_64") || arch.contains("amd64")) {
-                    return new PlatformTarget("linux", arch, "linux-x64", "libp4_core.so");
+                    return new PlatformTarget("linux", arch, "linux-x64", "libp4_core.so", "onionrelay");
                 }
             }
             throw new RuntimeException("Unsupported platform: os=" + os + ", arch=" + arch);
         }
     }
 }
-
-

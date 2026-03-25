@@ -61,8 +61,10 @@ jobs:
             artifact: win32-x64
           - os: ubuntu-22.04
             artifact: linux-x64
+          - os: macos-13
+            artifact: darwin-x64
           - os: macos-14
-            artifact: darwin-universal
+            artifact: darwin-arm64
     runs-on: ${{ matrix.os }}
 
     steps:
@@ -72,48 +74,114 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Setup MSYS2 (Windows onionrelay toolchain)
+        if: runner.os == 'Windows'
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+          install: >-
+            mingw-w64-x86_64-toolchain
+            mingw-w64-x86_64-openssl
+            mingw-w64-x86_64-libevent
+            mingw-w64-x86_64-xz
+            mingw-w64-x86_64-zstd
+            mingw-w64-x86_64-zlib
+            autoconf
+            automake
+            libtool
+            make
+            pkgconf
+
+      - name: Install Linux dependencies (onionrelay)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            pkg-config \
+            libevent-dev \
+            libssl-dev \
+            zlib1g-dev \
+            liblzma-dev \
+            libzstd-dev \
+            automake \
+            libtool \
+            autoconf
+
+      - name: Install macOS dependencies (onionrelay)
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          brew update
+          brew install \
+            pkg-config \
+            libevent \
+            openssl@3 \
+            xz \
+            zstd \
+            automake \
+            libtool \
+            autoconf
+
       - name: Build native core (Windows)
         if: runner.os == 'Windows'
         shell: powershell
         run: .\scripts\build_p4_core.ps1
 
       - name: Build native core (Linux/macOS)
-        if: runner.os == 'Linux'
+        if: runner.os != 'Windows'
         shell: bash
         run: |
           chmod +x scripts/build_p4_core_unix.sh
           ./scripts/build_p4_core_unix.sh
 
-      - name: Build native core (macOS universal)
-        if: runner.os == 'macOS'
+      - name: Build onionrelay (Windows)
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: .\build_onionrelay_windows.ps1
+
+      - name: Build onionrelay (Linux/macOS)
+        if: runner.os != 'Windows'
         shell: bash
         run: |
-          rustup target add aarch64-apple-darwin x86_64-apple-darwin
-          cargo build --manifest-path rust/Cargo.toml --release -p p4-ffi --target aarch64-apple-darwin
-          cargo build --manifest-path rust/Cargo.toml --release -p p4-ffi --target x86_64-apple-darwin
+          chmod +x scripts/build_onionrelay_unix.sh
+          ./scripts/build_onionrelay_unix.sh "${GITHUB_WORKSPACE}/dist" onionrelay
 
-      - name: Stage native artifact (Windows)
+      - name: Stage bundled payload (Windows)
         if: runner.os == 'Windows'
         shell: powershell
         run: |
-          New-Item -ItemType Directory -Force -Path out\win32-x64 | Out-Null
-          Copy-Item dist\p4_core\windows-x64\p4_core.dll out\win32-x64\p4_core.dll -Force
+          New-Item -ItemType Directory -Force -Path out\win32-x64\core | Out-Null
+          New-Item -ItemType Directory -Force -Path out\win32-x64\onionrelay | Out-Null
+          Copy-Item dist\p4_core\windows-x64\p4_core.dll out\win32-x64\core\p4_core.dll -Force
+          Copy-Item onionrelay_src\src\app\onionrelay.exe out\win32-x64\onionrelay\onionrelay.exe -Force
 
-      - name: Stage native artifact (Linux)
+          $dlls = Get-ChildItem onionrelay_src\src\app\*.dll -ErrorAction SilentlyContinue
+          foreach ($dll in $dlls) {
+            Copy-Item $dll.FullName out\win32-x64\onionrelay\ -Force
+          }
+
+      - name: Stage bundled payload (Linux)
         if: runner.os == 'Linux'
         shell: bash
         run: |
-          mkdir -p out/linux-x64
-          cp -f dist/p4_core/linux-x64/libp4_core.so out/linux-x64/libp4_core.so
+          mkdir -p out/linux-x64/core
+          mkdir -p out/linux-x64/onionrelay
+          cp -f dist/p4_core/linux-x64/libp4_core.so out/linux-x64/core/libp4_core.so
+          cp -f dist/onionrelay out/linux-x64/onionrelay/onionrelay
+          chmod +x out/linux-x64/onionrelay/onionrelay
 
-      - name: Stage native artifact (macOS universal)
+      - name: Stage bundled payload (macOS)
         if: runner.os == 'macOS'
         shell: bash
         run: |
-          mkdir -p out/darwin-x64
-          mkdir -p out/darwin-arm64
-          cp -f rust/target/x86_64-apple-darwin/release/libp4_ffi.dylib out/darwin-x64/libp4_core.dylib
-          cp -f rust/target/aarch64-apple-darwin/release/libp4_ffi.dylib out/darwin-arm64/libp4_core.dylib
+          mkdir -p "out/${{ matrix.artifact }}/core"
+          mkdir -p "out/${{ matrix.artifact }}/onionrelay"
+          cp -f dist/p4_core/macos/libp4_core.dylib "out/${{ matrix.artifact }}/core/libp4_core.dylib"
+          cp -f dist/onionrelay "out/${{ matrix.artifact }}/onionrelay/onionrelay"
+          chmod +x "out/${{ matrix.artifact }}/onionrelay/onionrelay"
 
       - name: Upload native artifact
         uses: actions/upload-artifact@v4
@@ -143,7 +211,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: npm-native-win32-x64
-          path: tmp_native/win
+          path: tmp_native/win32
 
       - name: Download native artifact (Linux x64)
         uses: actions/download-artifact@v4
@@ -151,38 +219,56 @@ jobs:
           name: npm-native-linux-x64
           path: tmp_native/linux
 
-      - name: Download native artifact (macOS universal)
+      - name: Download native artifact (macOS x64)
         uses: actions/download-artifact@v4
         with:
-          name: npm-native-darwin-universal
-          path: tmp_native/darwin
+          name: npm-native-darwin-x64
+          path: tmp_native/darwin-x64
+
+      - name: Download native artifact (macOS arm64)
+        uses: actions/download-artifact@v4
+        with:
+          name: npm-native-darwin-arm64
+          path: tmp_native/darwin-arm64
 
       - name: Stage downloaded native payload
         shell: bash
         run: |
+          mkdir -p bindings/javascript/native
+          mkdir -p bindings/javascript/onionrelay
+          find bindings/javascript/native -mindepth 1 -maxdepth 1 ! -name '.gitkeep' -exec rm -rf {} +
+          find bindings/javascript/onionrelay -mindepth 1 -maxdepth 1 ! -name '.gitkeep' -exec rm -rf {} +
+
+          rm -rf bindings/javascript/native/win32-x64
+          rm -rf bindings/javascript/native/linux-x64
+          rm -rf bindings/javascript/native/darwin-x64
+          rm -rf bindings/javascript/native/darwin-arm64
+          rm -rf bindings/javascript/onionrelay/win32-x64
+          rm -rf bindings/javascript/onionrelay/linux-x64
+          rm -rf bindings/javascript/onionrelay/darwin-x64
+          rm -rf bindings/javascript/onionrelay/darwin-arm64
+
           mkdir -p bindings/javascript/native/win32-x64
           mkdir -p bindings/javascript/native/linux-x64
           mkdir -p bindings/javascript/native/darwin-x64
           mkdir -p bindings/javascript/native/darwin-arm64
+          mkdir -p bindings/javascript/onionrelay/win32-x64
+          mkdir -p bindings/javascript/onionrelay/linux-x64
+          mkdir -p bindings/javascript/onionrelay/darwin-x64
+          mkdir -p bindings/javascript/onionrelay/darwin-arm64
 
-          WIN_SRC="$(find tmp_native/win -type f -name 'p4_core.dll' | head -n1)"
+          WIN_SRC="$(find tmp_native/win32 -type f -path '*core/p4_core.dll' | head -n1)"
           LIN_SRC="$(find tmp_native/linux -type f -name 'libp4_core.so' | head -n1)"
-          DARWIN_SRCS=($(find tmp_native/darwin -type f -name 'libp4_core.dylib'))
-          DARWIN_ARM=""
-          DARWIN_X64=""
-          for p in "${DARWIN_SRCS[@]}"; do
-            case "${p}" in
-              *darwin-arm64*|*aarch64-apple-darwin*)
-                DARWIN_ARM="${p}"
-                ;;
-              *darwin-x64*|*x86_64-apple-darwin*)
-                DARWIN_X64="${p}"
-                ;;
-            esac
-          done
+          DARWIN_X64="$(find tmp_native/darwin-x64 -type f -name 'libp4_core.dylib' | head -n1)"
+          DARWIN_ARM="$(find tmp_native/darwin-arm64 -type f -name 'libp4_core.dylib' | head -n1)"
 
-          if [ -z "${WIN_SRC}" ] || [ -z "${LIN_SRC}" ] || [ -z "${DARWIN_ARM}" ] || [ -z "${DARWIN_X64}" ]; then
-            echo "Failed to locate expected native artifacts."
+          WIN_ONION_DIR="$(find tmp_native/win32 -type d -name onionrelay | head -n1)"
+          LIN_ONION="$(find tmp_native/linux -type f -path '*onionrelay/onionrelay' | head -n1)"
+          DARWIN_X64_ONION="$(find tmp_native/darwin-x64 -type f -path '*onionrelay/onionrelay' | head -n1)"
+          DARWIN_ARM_ONION="$(find tmp_native/darwin-arm64 -type f -path '*onionrelay/onionrelay' | head -n1)"
+
+          if [ -z "${WIN_SRC}" ] || [ -z "${LIN_SRC}" ] || [ -z "${DARWIN_ARM}" ] || [ -z "${DARWIN_X64}" ] || [ -z "${WIN_ONION_DIR}" ] || [ -z "${LIN_ONION}" ] || [ -z "${DARWIN_X64_ONION}" ] || [ -z "${DARWIN_ARM_ONION}" ]; then
+            echo "Failed to locate expected native/onionrelay artifacts."
             find tmp_native -maxdepth 4 -type f -print
             exit 1
           fi
@@ -192,30 +278,22 @@ jobs:
           cp -f "${DARWIN_ARM}" bindings/javascript/native/darwin-arm64/libp4_core.dylib
           cp -f "${DARWIN_X64}" bindings/javascript/native/darwin-x64/libp4_core.dylib
 
+          cp -f "${WIN_ONION_DIR}"/* bindings/javascript/onionrelay/win32-x64/
+          cp -f "${LIN_ONION}" bindings/javascript/onionrelay/linux-x64/onionrelay
+          cp -f "${DARWIN_X64_ONION}" bindings/javascript/onionrelay/darwin-x64/onionrelay
+          cp -f "${DARWIN_ARM_ONION}" bindings/javascript/onionrelay/darwin-arm64/onionrelay
+          chmod +x bindings/javascript/onionrelay/linux-x64/onionrelay
+          chmod +x bindings/javascript/onionrelay/darwin-x64/onionrelay
+          chmod +x bindings/javascript/onionrelay/darwin-arm64/onionrelay
+
       - name: Verify package tarball
         working-directory: bindings/javascript
         run: npm pack --dry-run
 
       - name: Publish package
         working-directory: bindings/javascript
-        env:
-          NPM_ACCESS_TOKEN: ${{ secrets.NPM_ACCESS_TOKEN }}
         run: |
-          unset NODE_AUTH_TOKEN
-          if npm publish --access public --provenance; then
-            echo "Published via trusted publisher."
-            exit 0
-          fi
-
-          if [ -n "${NPM_ACCESS_TOKEN}" ]; then
-            echo "Trusted publish failed; trying token fallback."
-            export NODE_AUTH_TOKEN="${NPM_ACCESS_TOKEN}"
-            npm publish --access public
-            exit 0
-          fi
-
-          echo "Trusted publish failed and NPM_ACCESS_TOKEN is not set."
-          exit 1
+          npm publish --access public --provenance
 
   skip:
     needs: preflight

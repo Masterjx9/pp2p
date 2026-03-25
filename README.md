@@ -1,12 +1,12 @@
 # P4 (Persistent Point-to-Point Protocol)
 
-P4 keeps normal point-to-point data paths (WebRTC/DataChannel) and adds persistent onion rendezvous for rediscovery and automatic reconnect after disconnects.
+P4 keeps normal point-to-point data paths (WebRTC/DataChannel) and adds persistent rendezvous for rediscovery and automatic reconnect after disconnects.
 
 This repository is a monorepo containing:
 - Runtime reference CLI: `p4.py`
 - Rust core + C ABI: `rust/p4-core`, `rust/p4-ffi`, `include/p4_core.h`
 - SDK bindings: `bindings/`
-- Minimal onion relay source/build tree: `onionrelay_src/`
+- Minimal runtime transport source/build tree: `onionrelay_src/` (source builds only)
 
 ## Why P4
 
@@ -29,12 +29,12 @@ Example use cases:
 Protocol/runtime support:
 - Signed envelope identity/authentication via Rust core crypto
 - Peer reconnect loop after channel drop
-- Persistent onion rendezvous identity for rediscovery
+- Persistent rendezvous identity for rediscovery
 - WebRTC DataChannel messaging
 - STUN by default (`stun:stun.l.google.com:19302`)
 - TURN optional (recommended for stricter NAT environments)
 
-Platforms with bundled native core binaries:
+Packaged SDK targets with bundled native core + runtime transport (Python, npm, Maven):
 - Windows x64
 - Linux x64
 - macOS Intel (x64)
@@ -55,17 +55,18 @@ JavaScript/TypeScript:
 - Install: `npm i @pythonicit/p4-core-sdk`
 
 Java:
-- Coordinates: `io.github.masterjx9:p4-core-sdk:0.2.0`
+- Coordinates: `io.github.masterjx9:p4-core-sdk:0.2.1`
 - Maven Central: `https://central.sonatype.com/artifact/io.github.masterjx9/p4-core-sdk`
 
 PHP:
 - Package: `masterjx9/p4-core-sdk`
 - Packagist: `https://packagist.org/packages/masterjx9/p4-core-sdk`
 - Install: `composer require masterjx9/p4-core-sdk`
+- Runtime payload auto-resolution is included in package behavior.
 
 C++:
 - Wrapper lives in this repo: `bindings/cpp`
-- Uses bundled native payload under `native/p4_core/<platform>/`
+- Uses bundled runtime payload auto-resolution.
 
 ## Source Install (Secondary)
 
@@ -76,20 +77,24 @@ Use source installs only when developing/contributing to this monorepo:
 - PHP: `composer install` in repo root
 - C++: `cmake -S bindings/cpp -B bindings/cpp/build && cmake --build bindings/cpp/build --config Release`
 
+Source-only runtime build:
+- Windows: `powershell -ExecutionPolicy Bypass -File .\build_onionrelay_windows.ps1`
+- Linux/macOS: `./scripts/build_onionrelay_unix.sh`
+
 ## Abstract Device Requirements
 
 For any device/platform/language implementation of P4:
 - A stable local identity keypair persisted on disk
 - Ability to run the P4 native crypto core for that OS/arch
-- Network access to onion relay network for rendezvous signaling
+- Network access to the rendezvous network for rediscovery signaling
 - Network access for WebRTC ICE (STUN, optionally TURN)
-- Local storage for state (identity, known peers, onion service metadata)
+- Local storage for state (identity, known peers, service metadata)
 - Reasonably correct system clock for envelope freshness checks
 - Ability to open local loopback/listener ports for runtime signaling paths
 
 ## Python Test (Package-First)
 
-This test uses `pip install p4_core` first and does not require editable/source install.
+This test uses `pip install p4_core` with bundled runtime payloads (no source build required).
 
 1. Create env and install dependencies:
 
@@ -99,33 +104,26 @@ py -3 -m venv .venv
 python -m pip install --upgrade pip
 pip install p4_core aiortc cryptography
 ```
-
-2. Build onion relay binary (Windows):
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\build_onionrelay_windows.ps1
-```
-
-3. Initialize two peers:
+2. Initialize two peers:
 
 ```powershell
 python p4.py init --state-dir .\human_test\peerA
 python p4.py init --state-dir .\human_test\peerB
 ```
 
-4. Start peer A (terminal 1):
+3. Start peer A (terminal 1):
 
 ```powershell
-python p4.py run --state-dir .\human_test\peerA --mode onion --onionrelay-bin .\onionrelay_src\src\app\onionrelay.exe
+python p4.py run --state-dir .\human_test\peerA
 ```
 
-5. Start peer B (terminal 2):
+4. Start peer B (terminal 2):
 
 ```powershell
-python p4.py run --state-dir .\human_test\peerB --mode onion --onionrelay-bin .\onionrelay_src\src\app\onionrelay.exe
+python p4.py run --state-dir .\human_test\peerB
 ```
 
-6. In each `p4>` prompt:
+5. In each `p4>` prompt:
 - Run `/invite` and exchange JSON
 - Add the other peer invite: `/add-json <invite-json>` or `/add-file <path>`
 - Verify with `/peers`
@@ -142,7 +140,7 @@ Rust core:
 Python runtime:
 - `p4.py` is a reference node/CLI and consumes `p4_core` package.
 
-Onion relay:
+Runtime transport (source-only build tooling):
 - Windows subset build via `build_onionrelay_windows.ps1`
 - Linux/macOS build pipeline via `.github/workflows/build-onionrelay-unix.yml`
 
@@ -164,9 +162,7 @@ Onion relay:
 
 ## Security Notes
 
-- Onion is used for rendezvous/signaling persistence.
-- App data still runs over direct point-to-point channels when ICE succeeds.
+- App data runs over direct point-to-point channels when ICE succeeds.
+- Persistent rediscovery signaling is handled by the bundled runtime transport.
 - TURN is optional but recommended for higher reliability through strict NAT/firewall conditions.
 - You can override native lib path in all SDKs with `P4_CORE_LIB`.
-
-

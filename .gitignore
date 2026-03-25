@@ -40,12 +40,16 @@ bindings/javascript/node_modules/
 bindings/javascript/package-lock.json
 bindings/javascript/native/*
 !bindings/javascript/native/.gitkeep
+bindings/javascript/onionrelay/**
+!bindings/javascript/onionrelay/.gitkeep
 bindings/python/*.egg-info/
 bindings/python/build/
 bindings/python/dist/
 bindings/python/p4_core/native/**
 !bindings/python/p4_core/native/__init__.py
 !bindings/python/p4_core/native/.gitkeep
+bindings/python/p4_core/onionrelay/**
+!bindings/python/p4_core/onionrelay/.gitkeep
 bindings/python_legacy/*.egg-info/
 bindings/python_legacy/build/
 bindings/python_legacy/dist/
@@ -66,6 +70,8 @@ onionrelay_src/src/app/*.dylib
 onionrelay_src/lib*.a
 onionrelay_src/config.log
 onionrelay_src/config.status
+onionrelay/**
+!onionrelay/.gitkeep
 
 # Fly.io test app artifacts (kept local only for WAN testing)
 fly_test_app/

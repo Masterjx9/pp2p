@@ -37,7 +37,7 @@ from typing import Any, Optional
 from aiortc import RTCConfiguration, RTCDataChannel, RTCIceServer, RTCPeerConnection
 from aiortc import RTCSessionDescription
 
-from p4_core import P4Core, P4CoreError
+from p4_core import P4Core, P4CoreError, resolve_onionrelay_binary_path as resolve_packaged_onionrelay_binary_path
 
 
 PROTOCOL_VERSION = 1
@@ -166,12 +166,22 @@ def pick_onion_port_trio(state_dir: Path) -> tuple[int, int, int]:
 
 
 def local_onionrelay_binary_candidates() -> list[Path]:
-    return [
+    candidates = [
+        REPO_ROOT / "onionrelay" / "win32-x64" / "onionrelay.exe",
+        REPO_ROOT / "onionrelay" / "linux-x64" / "onionrelay",
+        REPO_ROOT / "onionrelay" / "darwin-x64" / "onionrelay",
+        REPO_ROOT / "onionrelay" / "darwin-arm64" / "onionrelay",
         REPO_ROOT / "onionrelay_src" / "src" / "app" / "onionrelay.exe",
         REPO_ROOT / "onionrelay_src" / "src" / "app" / "onionrelay",
         REPO_ROOT / "dist" / "onionrelay.exe",
         REPO_ROOT / "dist" / "onionrelay",
     ]
+    try:
+        bundled = Path(resolve_packaged_onionrelay_binary_path(None))
+        candidates.insert(0, bundled)
+    except Exception:
+        pass
+    return candidates
 
 
 def resolve_onionrelay_binary_path(onionrelay_bin: Optional[str]) -> str:
@@ -180,7 +190,8 @@ def resolve_onionrelay_binary_path(onionrelay_bin: Optional[str]) -> str:
 
     Priority:
     1) explicit --onionrelay-bin from caller
-    2) local source-built OnionRelay candidates in this repo
+    2) bundled SDK onionrelay runtime
+    3) local repo candidates
     """
     if onionrelay_bin:
         found = shutil.which(onionrelay_bin) or onionrelay_bin
@@ -188,9 +199,14 @@ def resolve_onionrelay_binary_path(onionrelay_bin: Optional[str]) -> str:
         if os.name == "nt" and p.exists() and p.suffix.lower() != ".exe":
             raise RuntimeError(
                 f"OnionRelay binary must be a native Windows executable (.exe): {p}. "
-                "Build Windows OnionRelay subset or provide a .exe path."
+                "Provide a .exe path."
             )
         return str(p)
+
+    try:
+        return resolve_packaged_onionrelay_binary_path(None)
+    except Exception:
+        pass
 
     for candidate in local_onionrelay_binary_candidates():
         if not candidate.exists():
@@ -203,8 +219,7 @@ def resolve_onionrelay_binary_path(onionrelay_bin: Optional[str]) -> str:
             return str(candidate)
 
     raise RuntimeError(
-        "No compatible OnionRelay binary found. Build local OnionRelay subset for this OS "
-        "(for example: build_onionrelay_windows.ps1 on Windows) "
+        "No compatible OnionRelay binary found. Install a package build that bundles onionrelay "
         "or pass --onionrelay-bin explicitly."
     )
 
@@ -560,7 +575,7 @@ class P4Node:
         if os.name == "nt" and onionrelay_path.exists() and onionrelay_path.suffix.lower() != ".exe":
             raise RuntimeError(
                 f"Refusing non-Windows OnionRelay binary on Windows: {onionrelay_path}. "
-                "Use onionrelay.exe built from the local source subset."
+                "Use onionrelay.exe."
             )
 
         self._onionrelay_root().mkdir(parents=True, exist_ok=True)
@@ -1565,8 +1580,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_run.add_argument(
         "--onionrelay-bin",
         help=(
-            "Optional OnionRelay runtime path/name. If omitted, p4 looks for local source-built "
-            "binaries (onionrelay_src/src/app/onionrelay or dist/onionrelay)."
+            "Optional OnionRelay runtime path/name. If omitted, p4 auto-resolves bundled onionrelay."
         ),
     )
     p_run.add_argument("--onionrelay-socks-port", type=int, default=None)
@@ -1589,7 +1603,6 @@ def main(argv: Optional[list[str]] = None) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-
 
 
 

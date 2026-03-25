@@ -103,6 +103,84 @@ CDEF;
         throw new RuntimeException($this->lastError());
     }
 
+    public static function resolveOnionrelayPath(?string $onionrelayPath = null): string
+    {
+        if ($onionrelayPath !== null && $onionrelayPath !== '') {
+            if (is_file($onionrelayPath)) {
+                return $onionrelayPath;
+            }
+            $resolved = self::lookupInPath($onionrelayPath);
+            if ($resolved !== null) {
+                return $resolved;
+            }
+            throw new RuntimeException("OnionRelay runtime not found: {$onionrelayPath}");
+        }
+
+        $envPath = getenv('P4_ONIONRELAY_BIN');
+        if ($envPath !== false && $envPath !== '') {
+            if (is_file((string)$envPath)) {
+                return (string)$envPath;
+            }
+            $resolved = self::lookupInPath((string)$envPath);
+            if ($resolved !== null) {
+                return $resolved;
+            }
+            throw new RuntimeException("OnionRelay runtime not found: {$envPath}");
+        }
+
+        [$platformDir, , $onionrelayName] = self::platformTarget();
+        $repoRoot = dirname(__DIR__, 3);
+        $candidates = [
+            $repoRoot . DIRECTORY_SEPARATOR . 'onionrelay' . DIRECTORY_SEPARATOR . $platformDir . DIRECTORY_SEPARATOR . $onionrelayName,
+            $repoRoot . DIRECTORY_SEPARATOR . 'bindings' . DIRECTORY_SEPARATOR . 'php' . DIRECTORY_SEPARATOR . 'onionrelay' . DIRECTORY_SEPARATOR . $platformDir . DIRECTORY_SEPARATOR . $onionrelayName,
+            $repoRoot . DIRECTORY_SEPARATOR . 'onionrelay_src' . DIRECTORY_SEPARATOR . 'src' . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . $onionrelayName,
+        ];
+
+        foreach ($candidates as $candidate) {
+            if (is_file($candidate)) {
+                return $candidate;
+            }
+        }
+
+        throw new RuntimeException(
+            'P4 onionrelay runtime not found for this platform. ' .
+            'Set P4_ONIONRELAY_BIN or use a package build that includes onionrelay.'
+        );
+    }
+
+    private static function lookupInPath(string $command): ?string
+    {
+        if ($command === '' || str_contains($command, DIRECTORY_SEPARATOR)) {
+            return null;
+        }
+        $pathEnv = getenv('PATH');
+        if ($pathEnv === false || $pathEnv === '') {
+            return null;
+        }
+
+        $extensions = [''];
+        if (PHP_OS_FAMILY === 'Windows') {
+            $pathExt = getenv('PATHEXT');
+            $extensions = $pathExt !== false && $pathExt !== '' ? explode(';', strtolower((string)$pathExt)) : ['.exe', '.bat', '.cmd'];
+        }
+
+        foreach (explode(PATH_SEPARATOR, (string)$pathEnv) as $dir) {
+            if ($dir === '') {
+                continue;
+            }
+            foreach ($extensions as $ext) {
+                $candidate = rtrim($dir, "\\/") . DIRECTORY_SEPARATOR . $command;
+                if ($ext !== '' && !str_ends_with(strtolower($candidate), $ext)) {
+                    $candidate .= $ext;
+                }
+                if (is_file($candidate)) {
+                    return $candidate;
+                }
+            }
+        }
+        return null;
+    }
+
     private function resolveLibraryPath(?string $libraryPath): string
     {
         if ($libraryPath !== null && $libraryPath !== '') {
@@ -114,7 +192,7 @@ CDEF;
             return $envPath;
         }
 
-        [$platformDir, $fileName] = $this->platformTarget();
+        [$platformDir, $fileName] = self::platformTarget();
         $repoRoot = dirname(__DIR__, 3);
         $bundled = $repoRoot . DIRECTORY_SEPARATOR . 'native' . DIRECTORY_SEPARATOR . 'p4_core' .
             DIRECTORY_SEPARATOR . $platformDir . DIRECTORY_SEPARATOR . $fileName;
@@ -124,37 +202,36 @@ CDEF;
         }
 
         throw new RuntimeException(
-            'P⁴ native library not found for this platform. ' .
+            'P4 native library not found for this platform. ' .
             'Set P4_CORE_LIB or use a package build that includes native binaries.'
         );
     }
 
     /**
-     * @return array{0:string,1:string}
+     * @return array{0:string,1:string,2:string}
      */
-    private function platformTarget(): array
+    private static function platformTarget(): array
     {
         $family = PHP_OS_FAMILY;
         $arch = strtolower((string)php_uname('m'));
 
         if ($family === 'Windows') {
             if (str_contains($arch, '64')) {
-                return ['win32-x64', 'p4_core.dll'];
+                return ['win32-x64', 'p4_core.dll', 'onionrelay.exe'];
             }
         } elseif ($family === 'Darwin') {
             if ($arch === 'arm64' || $arch === 'aarch64') {
-                return ['darwin-arm64', 'libp4_core.dylib'];
+                return ['darwin-arm64', 'libp4_core.dylib', 'onionrelay'];
             }
             if ($arch === 'x86_64' || $arch === 'amd64') {
-                return ['darwin-x64', 'libp4_core.dylib'];
+                return ['darwin-x64', 'libp4_core.dylib', 'onionrelay'];
             }
         } elseif ($family === 'Linux') {
             if ($arch === 'x86_64' || $arch === 'amd64') {
-                return ['linux-x64', 'libp4_core.so'];
+                return ['linux-x64', 'libp4_core.so', 'onionrelay'];
             }
         }
 
-        throw new RuntimeException("Unsupported platform for P⁴ native library: {$family}/{$arch}");
+        throw new RuntimeException("Unsupported platform for P4 runtime: {$family}/{$arch}");
     }
 }
-

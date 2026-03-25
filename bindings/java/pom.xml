@@ -6,7 +6,7 @@
 
   <groupId>io.github.masterjx9</groupId>
   <artifactId>p4-core-sdk</artifactId>
-  <version>0.2.0</version>
+  <version>0.2.1</version>
   <packaging>jar</packaging>
   <name>P4 Core SDK (Java)</name>
   <description>Java JNA SDK for the P4 Rust core C ABI</description>
@@ -53,6 +53,13 @@
       <resource>
         <directory>${project.basedir}/../../native/p4_core</directory>
         <targetPath>native/p4_core</targetPath>
+        <includes>
+          <include>**/*</include>
+        </includes>
+      </resource>
+      <resource>
+        <directory>${project.basedir}/../../onionrelay</directory>
+        <targetPath>onionrelay</targetPath>
         <includes>
           <include>**/*</include>
         </includes>

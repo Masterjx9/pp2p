@@ -1,8 +1,10 @@
 #include "p4_core_cpp.hpp"
 
 #include <cstdlib>
+#include <cctype>
 #include <filesystem>
 #include <mutex>
+#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -28,6 +30,7 @@ using fn_p4_free_string = void (*)(char *);
 
 std::mutex g_path_mutex;
 std::string g_explicit_library_path;
+std::string g_explicit_onionrelay_path;
 
 std::string platform_dir() {
 #if defined(_WIN32)
@@ -48,6 +51,14 @@ std::string library_name() {
   return "libp4_core.dylib";
 #else
   return "libp4_core.so";
+#endif
+}
+
+std::string onionrelay_name() {
+#if defined(_WIN32)
+  return "onionrelay.exe";
+#else
+  return "onionrelay";
 #endif
 }
 
@@ -121,6 +132,135 @@ std::string resolve_default_library_path() {
   throw std::runtime_error(
       "P4 native library not found. Set P4_CORE_LIB or place native binaries under "
       "native/p4_core/<platform>/");
+}
+
+std::filesystem::path find_in_path(const std::string &name) {
+  if (name.empty()) {
+    return {};
+  }
+
+  const auto candidate = std::filesystem::path(name);
+  if (candidate.has_parent_path() || candidate.is_absolute()) {
+    return file_exists(candidate) ? candidate : std::filesystem::path();
+  }
+
+  const char *path_env = std::getenv("PATH");
+  if (path_env == nullptr || path_env[0] == '\0') {
+    return {};
+  }
+
+#if defined(_WIN32)
+  const char separator = ';';
+  std::vector<std::string> extensions{""};
+  if (const char *pathext = std::getenv("PATHEXT"); pathext != nullptr && pathext[0] != '\0') {
+    std::stringstream ext_stream(pathext);
+    std::string ext;
+    extensions.clear();
+    while (std::getline(ext_stream, ext, ';')) {
+      if (!ext.empty()) {
+        extensions.push_back(ext);
+      }
+    }
+    if (extensions.empty()) {
+      extensions = {".exe", ".bat", ".cmd"};
+    }
+  } else {
+    extensions = {".exe", ".bat", ".cmd"};
+  }
+#else
+  const char separator = ':';
+  std::vector<std::string> extensions{""};
+#endif
+
+  std::stringstream path_stream(path_env);
+  std::string dir;
+  while (std::getline(path_stream, dir, separator)) {
+    if (dir.empty()) {
+      continue;
+    }
+    for (const auto &ext : extensions) {
+      auto p = std::filesystem::path(dir) / name;
+#if defined(_WIN32)
+      if (!ext.empty()) {
+        std::string lower = p.string();
+        for (char &ch : lower) {
+          ch = static_cast<char>(std::tolower(static_cast<unsigned char>(ch)));
+        }
+        std::string ext_lower = ext;
+        for (char &ch : ext_lower) {
+          ch = static_cast<char>(std::tolower(static_cast<unsigned char>(ch)));
+        }
+        if (lower.size() < ext_lower.size() ||
+            lower.substr(lower.size() - ext_lower.size()) != ext_lower) {
+          p += ext;
+        }
+      }
+#endif
+      if (file_exists(p)) {
+        return p;
+      }
+    }
+  }
+
+  return {};
+}
+
+std::string resolve_default_onionrelay_path() {
+  {
+    std::lock_guard<std::mutex> lock(g_path_mutex);
+    if (!g_explicit_onionrelay_path.empty()) {
+      auto explicit_candidate = std::filesystem::path(g_explicit_onionrelay_path);
+      if (file_exists(explicit_candidate)) {
+        return explicit_candidate.string();
+      }
+      auto in_path = find_in_path(g_explicit_onionrelay_path);
+      if (!in_path.empty()) {
+        return in_path.string();
+      }
+      throw std::runtime_error("OnionRelay runtime not found: " + g_explicit_onionrelay_path);
+    }
+  }
+
+  if (const char *env_path = std::getenv("P4_ONIONRELAY_BIN");
+      env_path != nullptr && env_path[0] != '\0') {
+    auto env_candidate = std::filesystem::path(env_path);
+    if (file_exists(env_candidate)) {
+      return env_candidate.string();
+    }
+    auto in_path = find_in_path(env_path);
+    if (!in_path.empty()) {
+      return in_path.string();
+    }
+    throw std::runtime_error(std::string("OnionRelay runtime not found: ") + env_path);
+  }
+
+  const auto rel_onionrelay_path = std::filesystem::path("onionrelay") / platform_dir() / onionrelay_name();
+  std::vector<std::filesystem::path> candidates;
+  candidates.push_back(std::filesystem::current_path() / rel_onionrelay_path);
+#ifdef P4_ONIONRELAY_ROOT
+  candidates.push_back(std::filesystem::path(P4_ONIONRELAY_ROOT) / platform_dir() / onionrelay_name());
+#endif
+  try {
+    candidates.push_back(executable_dir() / rel_onionrelay_path);
+  } catch (const std::exception &) {
+    // Ignore executable path lookup failures.
+  }
+  candidates.push_back(std::filesystem::current_path() / "onionrelay_src" / "src" / "app" / onionrelay_name());
+
+  for (const auto &candidate : candidates) {
+    if (file_exists(candidate)) {
+      return candidate.string();
+    }
+  }
+
+  auto in_path = find_in_path(onionrelay_name());
+  if (!in_path.empty()) {
+    return in_path.string();
+  }
+
+  throw std::runtime_error(
+      "P4 onionrelay runtime not found. Set P4_ONIONRELAY_BIN or place bundled runtime under "
+      "onionrelay/<platform>/");
 }
 
 class NativeApi {
@@ -222,6 +362,13 @@ void set_library_path(const std::string &path) {
 
 std::string resolve_library_path() { return resolve_default_library_path(); }
 
+void set_onionrelay_path(const std::string &path) {
+  std::lock_guard<std::mutex> lock(g_path_mutex);
+  g_explicit_onionrelay_path = path;
+}
+
+std::string resolve_onionrelay_path() { return resolve_default_onionrelay_path(); }
+
 std::string generate_identity_json() { return take_string(api().p4_generate_identity_json()); }
 
 std::string peer_id_from_public_key_b64(const std::string &public_key_b64) {
@@ -229,5 +376,3 @@ std::string peer_id_from_public_key_b64(const std::string &public_key_b64) {
 }
 
 }  // namespace p4
-
-

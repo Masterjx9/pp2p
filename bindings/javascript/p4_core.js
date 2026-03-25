@@ -7,21 +7,34 @@ const ref = require("ref-napi");
 const fs = require("fs");
 const path = require("path");
 
+function platformDir(platform, arch) {
+  if (platform === "win32" && arch === "x64") return "win32-x64";
+  if (platform === "linux" && arch === "x64") return "linux-x64";
+  if (platform === "darwin" && arch === "x64") return "darwin-x64";
+  if (platform === "darwin" && arch === "arm64") return "darwin-arm64";
+  return null;
+}
+
+function coreLibName(platform) {
+  if (platform === "win32") return "p4_core.dll";
+  if (platform === "darwin") return "libp4_core.dylib";
+  return "libp4_core.so";
+}
+
+function onionrelayName(platform) {
+  if (platform === "win32") return "onionrelay.exe";
+  return "onionrelay";
+}
+
 function defaultLibPath() {
   if (process.env.P4_CORE_LIB) {
     return process.env.P4_CORE_LIB;
   }
 
-  let bundled = null;
-  if (process.platform === "win32" && process.arch === "x64") {
-    bundled = path.resolve(__dirname, "native", "win32-x64", "p4_core.dll");
-  } else if (process.platform === "darwin" && process.arch === "x64") {
-    bundled = path.resolve(__dirname, "native", "darwin-x64", "libp4_core.dylib");
-  } else if (process.platform === "darwin" && process.arch === "arm64") {
-    bundled = path.resolve(__dirname, "native", "darwin-arm64", "libp4_core.dylib");
-  } else if (process.platform === "linux" && process.arch === "x64") {
-    bundled = path.resolve(__dirname, "native", "linux-x64", "libp4_core.so");
-  }
+  const dir = platformDir(process.platform, process.arch);
+  const bundled = dir
+    ? path.resolve(__dirname, "native", dir, coreLibName(process.platform))
+    : null;
 
   if (bundled && fs.existsSync(bundled)) {
     return bundled;
@@ -45,6 +58,48 @@ function defaultLibPath() {
     `P4 native library not found for ${process.platform}/${process.arch}. ` +
       `Set P4_CORE_LIB or install a package build that includes native binaries.`
   );
+}
+
+function defaultOnionrelayPath() {
+  if (process.env.P4_ONIONRELAY_BIN) {
+    return process.env.P4_ONIONRELAY_BIN;
+  }
+
+  const dir = platformDir(process.platform, process.arch);
+  const bundled = dir
+    ? path.resolve(__dirname, "onionrelay", dir, onionrelayName(process.platform))
+    : null;
+  if (bundled && fs.existsSync(bundled)) {
+    return bundled;
+  }
+
+  const exe = onionrelayName(process.platform);
+  const candidates = [
+    path.resolve(process.cwd(), "onionrelay", dir || "", exe),
+    path.resolve(process.cwd(), "dist", exe),
+    path.resolve(process.cwd(), "onionrelay_src", "src", "app", exe),
+  ];
+  for (const candidate of candidates) {
+    if (fs.existsSync(candidate)) {
+      return candidate;
+    }
+  }
+
+  throw new Error(
+    `P4 onionrelay runtime not found for ${process.platform}/${process.arch}. ` +
+      `Set P4_ONIONRELAY_BIN or install a package build that includes onionrelay.`
+  );
+}
+
+function resolveOnionrelayPath(pathOverride) {
+  const candidate = pathOverride || defaultOnionrelayPath();
+  if (path.isAbsolute(candidate) || candidate.includes(path.sep)) {
+    if (!fs.existsSync(candidate)) {
+      throw new Error(`OnionRelay runtime not found: ${candidate}`);
+    }
+    return candidate;
+  }
+  return candidate;
 }
 
 class P4Core {
@@ -110,6 +165,6 @@ class P4Core {
   }
 }
 
-module.exports = { P4Core };
+module.exports = { P4Core, resolveOnionrelayPath };
 
 

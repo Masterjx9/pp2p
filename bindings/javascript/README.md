@@ -11,18 +11,19 @@ npm i @pythonicit/p4-core-sdk
 ## Runtime requirements
 
 - Node.js 18+
-- Supported bundled-native targets:
+- Bundled native runtime targets:
   - Windows x64
   - Linux x64
   - macOS Intel (x64)
   - macOS Apple Silicon (arm64)
 
-For unsupported targets, set `P4_CORE_LIB` to a compatible native library path.
+Overrides:
+- `P4_CORE_LIB` for core native library path
 
 ## Example
 
 ```javascript
-const { P4Core } = require("./bindings/javascript/p4_core");
+const { P4Core } = require("@pythonicit/p4-core-sdk");
 
 const core = new P4Core();
 const a = core.generateIdentity();
@@ -39,5 +40,3 @@ const env = core.signEnvelope({
 core.verifyEnvelope({ envelope: env, signerPublicKeyB64: a.public_key_b64 });
 console.log("ok");
 ```
-
-

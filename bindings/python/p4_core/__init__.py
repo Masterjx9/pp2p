@@ -8,6 +8,7 @@ import ctypes
 import json
 import os
 import pathlib
+import shutil
 import time
 from typing import Any
 
@@ -18,6 +19,12 @@ def _platform_lib_name() -> str:
     if os.uname().sysname == "Darwin":
         return "libp4_core.dylib"
     return "libp4_core.so"
+
+
+def _platform_onionrelay_name() -> str:
+    if os.name == "nt":
+        return "onionrelay.exe"
+    return "onionrelay"
 
 
 def _platform_native_dir() -> str | None:
@@ -73,6 +80,47 @@ def _default_library_path() -> str:
 
     # Return best-guess bundled path so ctypes emits a useful file-not-found.
     return str(bundled)
+
+
+def _default_onionrelay_path() -> str:
+    env = os.environ.get("P4_ONIONRELAY_BIN")
+    if env:
+        return env
+
+    exe_name = _platform_onionrelay_name()
+    here = pathlib.Path(__file__).resolve().parent
+    native_dir = _platform_native_dir()
+    bundled = here / "onionrelay" / native_dir / exe_name if native_dir else here / "onionrelay" / exe_name
+    if bundled.exists():
+        return str(bundled)
+
+    repo_root = pathlib.Path(__file__).resolve().parents[3]
+    candidates = [
+        repo_root / "onionrelay" / (native_dir or "") / exe_name,
+        repo_root / "dist" / exe_name,
+        repo_root / "onionrelay_src" / "src" / "app" / exe_name,
+    ]
+    for candidate in candidates:
+        if candidate.exists():
+            return str(candidate)
+
+    return str(bundled)
+
+
+def resolve_onionrelay_binary_path(onionrelay_bin: str | None = None) -> str:
+    candidate = onionrelay_bin or _default_onionrelay_path()
+    resolved = shutil.which(candidate) or candidate
+    path = pathlib.Path(resolved)
+    if path.exists():
+        if os.name == "nt" and path.suffix.lower() != ".exe":
+            raise OSError(f"OnionRelay binary must be .exe on Windows: {path}")
+        return str(path)
+    if shutil.which(resolved):
+        return resolved
+    raise OSError(
+        "OnionRelay binary not found. Set P4_ONIONRELAY_BIN or install a package build "
+        "that bundles onionrelay."
+    )
 
 
 class P4CoreError(RuntimeError):
@@ -168,5 +216,8 @@ class P4Core:
         if ok == 1:
             return True
         raise P4CoreError(self.last_error())
+
+
+__all__ = ["P4Core", "P4CoreError", "resolve_onionrelay_binary_path"]
 
 

@@ -11,13 +11,14 @@ pip install p4_core
 ## Runtime requirements
 
 - Python 3.9+
-- Supported bundled-native targets:
+- Bundled native runtime targets:
   - Windows x64
   - Linux x64
   - macOS Intel (x64)
   - macOS Apple Silicon (arm64)
 
-For unsupported targets, set `P4_CORE_LIB` to a compatible native library path.
+Overrides:
+- `P4_CORE_LIB` for core native library path
 
 ## Example
 

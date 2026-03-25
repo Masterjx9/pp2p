@@ -4,13 +4,13 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "p4-core-sdk"
-version = "0.2.2"
+version = "0.2.3"
 description = "Deprecated compatibility package. Use p4_core."
 readme = "README.md"
 requires-python = ">=3.9"
 authors = [{ name = "P4" }]
 license = "MIT"
-dependencies = ["p4_core>=0.2.2"]
+dependencies = ["p4_core>=0.2.3"]
 classifiers = [
   "Programming Language :: Python :: 3",
   "Programming Language :: Python :: 3 :: Only",
@@ -19,5 +19,4 @@ classifiers = [
 
 [tool.setuptools]
 py-modules = []
-
 

@@ -14,6 +14,7 @@ target_include_directories(p4_core_cpp PUBLIC
 
 target_compile_definitions(p4_core_cpp PRIVATE
   P4_NATIVE_ROOT="${CMAKE_CURRENT_SOURCE_DIR}/../../native/p4_core"
+  P4_ONIONRELAY_ROOT="${CMAKE_CURRENT_SOURCE_DIR}/../../onionrelay"
 )
 
 if(UNIX AND NOT APPLE)

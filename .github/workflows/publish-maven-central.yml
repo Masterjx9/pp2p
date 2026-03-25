@@ -10,10 +10,12 @@ on:
       - main
 
 jobs:
-  publish:
+  preflight:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+    outputs:
+      publish_needed: ${{ steps.maven_check.outputs.publish_needed }}
 
     steps:
       - name: Checkout
@@ -57,8 +59,236 @@ jobs:
               out.write(f"publish_needed={'true' if publish_needed else 'false'}\n")
           PY
 
+  build_payload:
+    needs: preflight
+    if: needs.preflight.outputs.publish_needed == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-2022
+            artifact: win32-x64
+          - os: ubuntu-22.04
+            artifact: linux-x64
+          - os: macos-13
+            artifact: darwin-x64
+          - os: macos-14
+            artifact: darwin-arm64
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Setup MSYS2 (Windows onionrelay toolchain)
+        if: runner.os == 'Windows'
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+          install: >-
+            mingw-w64-x86_64-toolchain
+            mingw-w64-x86_64-openssl
+            mingw-w64-x86_64-libevent
+            mingw-w64-x86_64-xz
+            mingw-w64-x86_64-zstd
+            mingw-w64-x86_64-zlib
+            autoconf
+            automake
+            libtool
+            make
+            pkgconf
+
+      - name: Install Linux dependencies (onionrelay)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            pkg-config \
+            libevent-dev \
+            libssl-dev \
+            zlib1g-dev \
+            liblzma-dev \
+            libzstd-dev \
+            automake \
+            libtool \
+            autoconf
+
+      - name: Install macOS dependencies (onionrelay)
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          brew update
+          brew install \
+            pkg-config \
+            libevent \
+            openssl@3 \
+            xz \
+            zstd \
+            automake \
+            libtool \
+            autoconf
+
+      - name: Build native core (Windows)
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: .\scripts\build_p4_core.ps1
+
+      - name: Build native core (Linux/macOS)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          chmod +x scripts/build_p4_core_unix.sh
+          ./scripts/build_p4_core_unix.sh
+
+      - name: Build onionrelay (Windows)
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: .\build_onionrelay_windows.ps1
+
+      - name: Build onionrelay (Linux/macOS)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          chmod +x scripts/build_onionrelay_unix.sh
+          ./scripts/build_onionrelay_unix.sh "${GITHUB_WORKSPACE}/dist" onionrelay
+
+      - name: Stage bundled payload (Windows)
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: |
+          New-Item -ItemType Directory -Force -Path out\win32-x64\core | Out-Null
+          New-Item -ItemType Directory -Force -Path out\win32-x64\onionrelay | Out-Null
+          Copy-Item dist\p4_core\windows-x64\p4_core.dll out\win32-x64\core\p4_core.dll -Force
+          Copy-Item onionrelay_src\src\app\onionrelay.exe out\win32-x64\onionrelay\onionrelay.exe -Force
+
+          $dlls = Get-ChildItem onionrelay_src\src\app\*.dll -ErrorAction SilentlyContinue
+          foreach ($dll in $dlls) {
+            Copy-Item $dll.FullName out\win32-x64\onionrelay\ -Force
+          }
+
+      - name: Stage bundled payload (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          mkdir -p out/linux-x64/core
+          mkdir -p out/linux-x64/onionrelay
+          cp -f dist/p4_core/linux-x64/libp4_core.so out/linux-x64/core/libp4_core.so
+          cp -f dist/onionrelay out/linux-x64/onionrelay/onionrelay
+          chmod +x out/linux-x64/onionrelay/onionrelay
+
+      - name: Stage bundled payload (macOS)
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          mkdir -p "out/${{ matrix.artifact }}/core"
+          mkdir -p "out/${{ matrix.artifact }}/onionrelay"
+          cp -f dist/p4_core/macos/libp4_core.dylib "out/${{ matrix.artifact }}/core/libp4_core.dylib"
+          cp -f dist/onionrelay "out/${{ matrix.artifact }}/onionrelay/onionrelay"
+          chmod +x "out/${{ matrix.artifact }}/onionrelay/onionrelay"
+
+      - name: Upload native artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: maven-native-${{ matrix.artifact }}
+          path: out/**
+
+  publish:
+    needs: [preflight, build_payload]
+    if: needs.preflight.outputs.publish_needed == 'true' && github.event_name != 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download native artifact (Windows x64)
+        uses: actions/download-artifact@v4
+        with:
+          name: maven-native-win32-x64
+          path: tmp_native/win32
+
+      - name: Download native artifact (Linux x64)
+        uses: actions/download-artifact@v4
+        with:
+          name: maven-native-linux-x64
+          path: tmp_native/linux
+
+      - name: Download native artifact (macOS x64)
+        uses: actions/download-artifact@v4
+        with:
+          name: maven-native-darwin-x64
+          path: tmp_native/darwin-x64
+
+      - name: Download native artifact (macOS arm64)
+        uses: actions/download-artifact@v4
+        with:
+          name: maven-native-darwin-arm64
+          path: tmp_native/darwin-arm64
+
+      - name: Stage downloaded payload
+        shell: bash
+        run: |
+          mkdir -p native/p4_core
+          mkdir -p onionrelay
+          find native/p4_core -mindepth 1 -maxdepth 1 -exec rm -rf {} +
+          find onionrelay -mindepth 1 -maxdepth 1 ! -name '.gitkeep' -exec rm -rf {} +
+
+          rm -rf native/p4_core/win32-x64
+          rm -rf native/p4_core/linux-x64
+          rm -rf native/p4_core/darwin-x64
+          rm -rf native/p4_core/darwin-arm64
+          rm -rf onionrelay/win32-x64
+          rm -rf onionrelay/linux-x64
+          rm -rf onionrelay/darwin-x64
+          rm -rf onionrelay/darwin-arm64
+
+          mkdir -p native/p4_core/win32-x64
+          mkdir -p native/p4_core/linux-x64
+          mkdir -p native/p4_core/darwin-x64
+          mkdir -p native/p4_core/darwin-arm64
+          mkdir -p onionrelay/win32-x64
+          mkdir -p onionrelay/linux-x64
+          mkdir -p onionrelay/darwin-x64
+          mkdir -p onionrelay/darwin-arm64
+
+          WIN_SRC="$(find tmp_native/win32 -type f -path '*core/p4_core.dll' | head -n1)"
+          LIN_SRC="$(find tmp_native/linux -type f -name 'libp4_core.so' | head -n1)"
+          DARWIN_X64="$(find tmp_native/darwin-x64 -type f -name 'libp4_core.dylib' | head -n1)"
+          DARWIN_ARM="$(find tmp_native/darwin-arm64 -type f -name 'libp4_core.dylib' | head -n1)"
+
+          WIN_ONION_DIR="$(find tmp_native/win32 -type d -name onionrelay | head -n1)"
+          LIN_ONION="$(find tmp_native/linux -type f -path '*onionrelay/onionrelay' | head -n1)"
+          DARWIN_X64_ONION="$(find tmp_native/darwin-x64 -type f -path '*onionrelay/onionrelay' | head -n1)"
+          DARWIN_ARM_ONION="$(find tmp_native/darwin-arm64 -type f -path '*onionrelay/onionrelay' | head -n1)"
+
+          if [ -z "${WIN_SRC}" ] || [ -z "${LIN_SRC}" ] || [ -z "${DARWIN_ARM}" ] || [ -z "${DARWIN_X64}" ] || [ -z "${WIN_ONION_DIR}" ] || [ -z "${LIN_ONION}" ] || [ -z "${DARWIN_X64_ONION}" ] || [ -z "${DARWIN_ARM_ONION}" ]; then
+            echo "Failed to locate expected native/onionrelay artifacts."
+            find tmp_native -maxdepth 5 -type f -print
+            exit 1
+          fi
+
+          cp -f "${WIN_SRC}" native/p4_core/win32-x64/p4_core.dll
+          cp -f "${LIN_SRC}" native/p4_core/linux-x64/libp4_core.so
+          cp -f "${DARWIN_X64}" native/p4_core/darwin-x64/libp4_core.dylib
+          cp -f "${DARWIN_ARM}" native/p4_core/darwin-arm64/libp4_core.dylib
+
+          cp -f "${WIN_ONION_DIR}"/* onionrelay/win32-x64/
+          cp -f "${LIN_ONION}" onionrelay/linux-x64/onionrelay
+          cp -f "${DARWIN_X64_ONION}" onionrelay/darwin-x64/onionrelay
+          cp -f "${DARWIN_ARM_ONION}" onionrelay/darwin-arm64/onionrelay
+          chmod +x onionrelay/linux-x64/onionrelay
+          chmod +x onionrelay/darwin-x64/onionrelay
+          chmod +x onionrelay/darwin-arm64/onionrelay
+
       - name: Setup Java + Maven credentials
-        if: steps.maven_check.outputs.publish_needed == 'true' && github.event_name != 'push'
         uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -70,7 +300,6 @@ jobs:
           gpg-passphrase: MAVEN_GPG_PASSPHRASE
 
       - name: Publish to Maven Central
-        if: steps.maven_check.outputs.publish_needed == 'true' && github.event_name != 'push'
         env:
           MAVEN_CENTRAL_USERNAME: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
           MAVEN_CENTRAL_PASSWORD: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
@@ -86,10 +315,16 @@ jobs:
           fi
           mvn -B --no-transfer-progress -f bindings/java/pom.xml -Prelease deploy
 
-      - name: Skip publish on main push (preflight only)
-        if: github.event_name == 'push' && steps.maven_check.outputs.publish_needed == 'true'
-        run: echo "Main push run completed; Maven publish is performed on release/workflow_dispatch."
+  skip_on_push:
+    needs: [preflight, build_payload]
+    if: github.event_name == 'push' && needs.preflight.outputs.publish_needed == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "Main push run completed; Maven publish is performed on release/workflow_dispatch."
 
-      - name: Skip publish (already exists)
-        if: steps.maven_check.outputs.publish_needed != 'true'
-        run: echo "Version already exists on Maven Central; skipping publish."
+  skip_existing:
+    needs: preflight
+    if: needs.preflight.outputs.publish_needed != 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "Version already exists on Maven Central; skipping publish."

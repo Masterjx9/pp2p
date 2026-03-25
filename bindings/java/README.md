@@ -12,14 +12,14 @@ Namespace/groupId configured:
 <dependency>
   <groupId>io.github.masterjx9</groupId>
   <artifactId>p4-core-sdk</artifactId>
-  <version>0.2.0</version>
+  <version>0.2.1</version>
 </dependency>
 ```
 
 ## Runtime requirements
 
 - Java 11+
-- Bundled native binary is auto-loaded for:
+- Bundled native runtime payload is auto-loaded for:
   - Windows x64
   - Linux x64
   - macOS Intel (x64)

@@ -15,6 +15,11 @@ function libName(platform) {
   return "libp4_core.so";
 }
 
+function onionrelayName(platform) {
+  if (platform === "win32") return "onionrelay.exe";
+  return "onionrelay";
+}
+
 if (process.env.P4_CORE_LIB) {
   process.exit(0);
 }
@@ -37,3 +42,13 @@ if (!fs.existsSync(expected)) {
   process.exit(1);
 }
 
+if (!process.env.P4_ONIONRELAY_BIN) {
+  const expectedOnionrelay = path.resolve(__dirname, "..", "onionrelay", dir, onionrelayName(process.platform));
+  if (!fs.existsSync(expectedOnionrelay)) {
+    console.error(
+      `[p4-core-sdk] Missing bundled onionrelay runtime: ${expectedOnionrelay}. ` +
+        "Reinstall package or set P4_ONIONRELAY_BIN."
+    );
+    process.exit(1);
+  }
+}
