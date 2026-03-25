@@ -298,7 +298,7 @@ jobs:
       - name: Publish package
         working-directory: bindings/javascript
         run: |
-          npm publish --access public --provenance
+          npm publish --access public
 
   skip:
     needs: preflight
