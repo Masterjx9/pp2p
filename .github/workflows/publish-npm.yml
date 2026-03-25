@@ -32,6 +32,4 @@ jobs:
 
       - name: Publish package
         working-directory: bindings/javascript
-        env:
-          NPM_CONFIG_PROVENANCE: true
-        run: npm publish --access public --provenance
+        run: npm publish --access public
