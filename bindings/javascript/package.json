@@ -11,6 +11,11 @@
     "ffi",
     "rust"
   ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Masterjx9/p4.git",
+    "directory": "bindings/javascript"
+  },
   "engines": {
     "node": ">=18 <=22"
   },
@@ -20,6 +25,10 @@
   "dependencies": {
     "ffi-napi": "^4.0.3",
     "ref-napi": "^3.0.3"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
   },
   "files": [
     "README.md",

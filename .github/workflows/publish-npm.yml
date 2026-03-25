@@ -209,12 +209,11 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
-          registry-url: "https://registry.npmjs.org"
+          node-version: "24"
 
       - name: Upgrade npm for trusted publishing
         run: |
-          npm install -g npm@^11.5.1
+          npm install -g npm@11.6.2
           npm --version
 
       - name: Download native artifact (Windows x64)
@@ -302,8 +301,10 @@ jobs:
 
       - name: Publish package
         working-directory: bindings/javascript
+        env:
+          NPM_CONFIG_PROVENANCE: true
         run: |
-          npm publish --access public
+          npm publish --access public --provenance
 
   skip:
     needs: preflight
