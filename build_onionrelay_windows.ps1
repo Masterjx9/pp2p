@@ -10,22 +10,23 @@ $repoRoot = (Resolve-Path ".").Path
 function Get-MsysBashPath {
     $candidates = @()
 
+    $bashFromPath = (Get-Command bash -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty Source)
+    if ($bashFromPath) {
+        $candidates += $bashFromPath
+    }
     if ($env:MSYS2_ROOT) {
         $candidates += (Join-Path $env:MSYS2_ROOT "usr\bin\bash.exe")
     }
     if ($env:RUNNER_TEMP) {
         $candidates += (Join-Path $env:RUNNER_TEMP "msys64\usr\bin\bash.exe")
     }
-    $bashFromPath = (Get-Command bash -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty Source)
-    if ($bashFromPath) {
-        $candidates += $bashFromPath
+    if ($env:ChocolateyInstall) {
+        $candidates += (Join-Path $env:ChocolateyInstall "lib\msys2\tools\usr\bin\bash.exe")
     }
-    if (-not $isGitHubActions) {
-        $candidates += "C:\msys64\usr\bin\bash.exe"
-        $candidates += "C:\tools\msys64\usr\bin\bash.exe"
-    }
+    $candidates += "C:\msys64\usr\bin\bash.exe"
+    $candidates += "C:\tools\msys64\usr\bin\bash.exe"
 
-    foreach ($candidate in $candidates) {
+    foreach ($candidate in ($candidates | Select-Object -Unique)) {
         if (-not $candidate) {
             continue
         }
@@ -33,10 +34,9 @@ function Get-MsysBashPath {
             continue
         }
 
-        # Reject WSL/Git-for-Windows bash; we need an MSYS2 install.
-        $dir = Split-Path -Parent $candidate
-        $pacman = Join-Path $dir "pacman.exe"
-        if (Test-Path $pacman) {
+        # Reject WSL/Git-for-Windows bash; verify this bash can resolve pacman.
+        & $candidate -lc "command -v pacman >/dev/null 2>&1"
+        if ($LASTEXITCODE -eq 0) {
             return $candidate
         }
     }
