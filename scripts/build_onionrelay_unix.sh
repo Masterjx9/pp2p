@@ -47,6 +47,7 @@ find . -type d -name .deps -prune -exec rm -rf {} + || true
 find . -name "*.Po" -delete || true
 find . -name "*.Plo" -delete || true
 rm -f config.log config.status || true
+chmod +x ./scripts/build/combine_libs || true
 
 # Generate configure script when building from source snapshots that don't
 # include pre-generated autotools outputs.

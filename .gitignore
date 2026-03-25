@@ -30,6 +30,8 @@ scripts/region_cutover_test.ps1
 
 # Build and packaging artifacts
 build/
+!onionrelay_src/scripts/build/
+!onionrelay_src/scripts/build/combine_libs
 dist/
 rust/target/
 release/

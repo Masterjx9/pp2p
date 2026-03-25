@@ -39,6 +39,7 @@ export PATH=/mingw64/bin:/usr/bin:$PATH
 cd "__SRC_DIR__"
 
 make distclean >/dev/null 2>&1 || true
+chmod +x ./scripts/build/combine_libs || true
 
 if [[ ! -x "./configure" ]]; then
   chmod +x ./autogen.sh

@@ -22,7 +22,7 @@ jobs:
             artifact: p4-core-windows-x64
           - os: ubuntu-22.04
             artifact: p4-core-linux-x64
-          - os: macos-13
+          - os: macos-15-intel
             artifact: p4-core-macos-intel
           - os: macos-14
             artifact: p4-core-macos-apple-silicon
@@ -63,5 +63,4 @@ jobs:
         with:
           name: ${{ matrix.artifact }}
           path: ${{ matrix.artifact }}.tar.gz
-
 

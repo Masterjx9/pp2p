@@ -1,0 +1,49 @@
+#!/bin/sh
+
+set -eu
+
+if [ "$#" -lt 2 ]; then
+  echo "Usage: $0 <output-archive> <input-archive> [<input-archive> ...]" >&2
+  exit 2
+fi
+
+OUT_ARCHIVE="$1"
+shift
+
+: "${AR:=ar}"
+: "${ARFLAGS:=rcs}"
+: "${RANLIB:=ranlib}"
+
+for lib in "$@"; do
+  if [ ! -f "$lib" ]; then
+    echo "combine_libs: missing input archive: $lib" >&2
+    exit 1
+  fi
+done
+
+TMP_MRI="${TMPDIR:-/tmp}/combine_libs.$$.$RANDOM.mri"
+cleanup() {
+  rm -f "$TMP_MRI"
+}
+trap cleanup EXIT INT TERM
+
+{
+  printf 'CREATE %s\n' "$OUT_ARCHIVE"
+  for lib in "$@"; do
+    printf 'ADDLIB %s\n' "$lib"
+  done
+  printf 'SAVE\n'
+  printf 'END\n'
+} >"$TMP_MRI"
+
+if ! "$AR" -M <"$TMP_MRI" >/dev/null 2>&1; then
+  if command -v libtool >/dev/null 2>&1; then
+    rm -f "$OUT_ARCHIVE"
+    libtool -static -o "$OUT_ARCHIVE" "$@"
+  else
+    echo "combine_libs: '$AR -M' failed and 'libtool' is unavailable." >&2
+    exit 1
+  fi
+fi
+
+"$RANLIB" "$OUT_ARCHIVE" >/dev/null 2>&1 || true
