@@ -1,6 +1,6 @@
 {
   "name": "@pythonicit/p4-core-sdk",
-  "version": "0.2.6",
+  "version": "0.2.7",
   "description": "Node.js SDK for the P4 Rust core C ABI",
   "main": "p4_core.js",
   "types": "p4_core.d.ts",
