@@ -3,6 +3,7 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+$isGitHubActions = ($env:GITHUB_ACTIONS -eq "true")
 
 $repoRoot = (Resolve-Path ".").Path
 
@@ -19,8 +20,10 @@ function Get-MsysBashPath {
     if ($bashFromPath) {
         $candidates += $bashFromPath
     }
-    $candidates += "C:\msys64\usr\bin\bash.exe"
-    $candidates += "C:\tools\msys64\usr\bin\bash.exe"
+    if (-not $isGitHubActions) {
+        $candidates += "C:\msys64\usr\bin\bash.exe"
+        $candidates += "C:\tools\msys64\usr\bin\bash.exe"
+    }
 
     foreach ($candidate in $candidates) {
         if (-not $candidate) {
@@ -43,6 +46,9 @@ function Get-MsysBashPath {
 
 $bash = Get-MsysBashPath
 if (-not $bash) {
+    if ($isGitHubActions) {
+        throw "MSYS2 bash not found from setup-msys2 environment (expected under `$RUNNER_TEMP\\msys64)."
+    }
     throw "MSYS2 bash not found. Install MSYS2 (or run msys2/setup-msys2 in CI) and retry."
 }
 if (-not (Test-Path $SourceDir)) {
@@ -72,8 +78,9 @@ set -euo pipefail
 export MSYSTEM=MINGW64
 export PATH=/mingw64/bin:/usr/bin:$PATH
 
-# Bootstrap required build deps if this is a fresh MSYS2 install.
-if command -v pacman >/dev/null 2>&1; then
+# Bootstrap required build deps for local/dev usage.
+# In GitHub Actions, setup-msys2 already installs these packages.
+if [[ -z "${GITHUB_ACTIONS:-}" ]] && command -v pacman >/dev/null 2>&1; then
   pacman --noconfirm --needed -Sy \
     mingw-w64-x86_64-toolchain \
     mingw-w64-x86_64-openssl \
