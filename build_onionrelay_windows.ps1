@@ -10,10 +10,6 @@ $repoRoot = (Resolve-Path ".").Path
 function Get-MsysBashPath {
     $candidates = @()
 
-    $bashFromPath = (Get-Command bash -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty Source)
-    if ($bashFromPath) {
-        $candidates += $bashFromPath
-    }
     if ($env:MSYS2_ROOT) {
         $candidates += (Join-Path $env:MSYS2_ROOT "usr\bin\bash.exe")
     }
@@ -25,6 +21,15 @@ function Get-MsysBashPath {
     }
     $candidates += "C:\msys64\usr\bin\bash.exe"
     $candidates += "C:\tools\msys64\usr\bin\bash.exe"
+    $bashFromPath = (Get-Command bash -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty Source)
+    if ($bashFromPath) {
+        $candidates += $bashFromPath
+    }
+
+    $toolCheck = "command -v pacman >/dev/null 2>&1"
+    if ($isGitHubActions) {
+        $toolCheck = "command -v pacman >/dev/null 2>&1 && command -v aclocal >/dev/null 2>&1 && command -v autoreconf >/dev/null 2>&1"
+    }
 
     foreach ($candidate in ($candidates | Select-Object -Unique)) {
         if (-not $candidate) {
@@ -34,8 +39,8 @@ function Get-MsysBashPath {
             continue
         }
 
-        # Reject WSL/Git-for-Windows bash; verify this bash can resolve pacman.
-        & $candidate -lc "command -v pacman >/dev/null 2>&1"
+        # Reject WSL/Git-for-Windows bash; verify required MSYS2 tools exist.
+        & $candidate -lc $toolCheck
         if ($LASTEXITCODE -eq 0) {
             return $candidate
         }
@@ -44,15 +49,12 @@ function Get-MsysBashPath {
     return $null
 }
 
-if ($isGitHubActions) {
-    # setup-msys2 wires the correct MSYS2 bash into PATH for this job.
-    $bash = "bash"
-}
-else {
-    $bash = Get-MsysBashPath
-    if (-not $bash) {
-        throw "MSYS2 bash not found. Install MSYS2 and ensure an MSYS2 bash with pacman is available."
+$bash = Get-MsysBashPath
+if (-not $bash) {
+    if ($isGitHubActions) {
+        throw "MSYS2 bash with required tools (pacman, aclocal, autoreconf) was not found."
     }
+    throw "MSYS2 bash not found. Install MSYS2 and ensure an MSYS2 bash with pacman is available."
 }
 if (-not (Test-Path $SourceDir)) {
     throw "Source directory not found: $SourceDir"
@@ -97,6 +99,11 @@ if [[ -z "${GITHUB_ACTIONS:-}" ]] && command -v pacman >/dev/null 2>&1; then
     make \
     pkgconf \
     gettext
+fi
+
+if ! command -v aclocal >/dev/null 2>&1 || ! command -v autoreconf >/dev/null 2>&1; then
+  echo "Required autotools commands are missing in selected MSYS2 shell." >&2
+  exit 1
 fi
 
 cd "__SRC_DIR__"
