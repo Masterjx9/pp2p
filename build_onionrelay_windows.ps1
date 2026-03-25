@@ -5,9 +5,45 @@ param(
 $ErrorActionPreference = "Stop"
 
 $repoRoot = (Resolve-Path ".").Path
-$bash = "C:\msys64\usr\bin\bash.exe"
-if (-not (Test-Path $bash)) {
-    throw "MSYS2 bash not found at $bash"
+
+function Get-MsysBashPath {
+    $candidates = @()
+
+    if ($env:MSYS2_ROOT) {
+        $candidates += (Join-Path $env:MSYS2_ROOT "usr\bin\bash.exe")
+    }
+    if ($env:RUNNER_TEMP) {
+        $candidates += (Join-Path $env:RUNNER_TEMP "msys64\usr\bin\bash.exe")
+    }
+    $bashFromPath = (Get-Command bash -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty Source)
+    if ($bashFromPath) {
+        $candidates += $bashFromPath
+    }
+    $candidates += "C:\msys64\usr\bin\bash.exe"
+    $candidates += "C:\tools\msys64\usr\bin\bash.exe"
+
+    foreach ($candidate in $candidates) {
+        if (-not $candidate) {
+            continue
+        }
+        if (-not (Test-Path $candidate)) {
+            continue
+        }
+
+        # Reject WSL/Git-for-Windows bash; we need an MSYS2 install.
+        $dir = Split-Path -Parent $candidate
+        $pacman = Join-Path $dir "pacman.exe"
+        if (Test-Path $pacman) {
+            return $candidate
+        }
+    }
+
+    return $null
+}
+
+$bash = Get-MsysBashPath
+if (-not $bash) {
+    throw "MSYS2 bash not found. Install MSYS2 (or run msys2/setup-msys2 in CI) and retry."
 }
 if (-not (Test-Path $SourceDir)) {
     throw "Source directory not found: $SourceDir"
@@ -35,6 +71,23 @@ source /etc/profile
 set -euo pipefail
 export MSYSTEM=MINGW64
 export PATH=/mingw64/bin:/usr/bin:$PATH
+
+# Bootstrap required build deps if this is a fresh MSYS2 install.
+if command -v pacman >/dev/null 2>&1; then
+  pacman --noconfirm --needed -Sy \
+    mingw-w64-x86_64-toolchain \
+    mingw-w64-x86_64-openssl \
+    mingw-w64-x86_64-libevent \
+    mingw-w64-x86_64-xz \
+    mingw-w64-x86_64-zstd \
+    mingw-w64-x86_64-zlib \
+    autoconf \
+    automake \
+    libtool \
+    make \
+    pkgconf \
+    gettext
+fi
 
 cd "__SRC_DIR__"
 
