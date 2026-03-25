@@ -7,48 +7,56 @@ if [ "$#" -lt 2 ]; then
   exit 2
 fi
 
-OUT_ARCHIVE="$1"
+abspath() {
+  case "$1" in
+    /*) printf '%s\n' "$1" ;;
+    *) printf '%s/%s\n' "$(pwd)" "$1" ;;
+  esac
+}
+
+apple_symdef_fix() {
+  # On modern macOS/iOS, strip __.SYMDEF* before re-archiving.
+  if [ "$(uname -s)" = "Darwin" ]; then
+    find . -name "__.SYMDEF*" -delete
+  fi
+}
+
+TARGET="$(abspath "$1")"
 shift
 
-: "${AR:=ar}"
-: "${ARFLAGS:=rcs}"
-: "${RANLIB:=ranlib}"
-
-for lib in "$@"; do
-  if [ ! -f "$lib" ]; then
-    echo "combine_libs: missing input archive: $lib" >&2
-    exit 1
-  fi
-done
-
 if command -v mktemp >/dev/null 2>&1; then
-  TMP_MRI="$(mktemp "${TMPDIR:-/tmp}/combine_libs.XXXXXX.mri")"
+  WORKDIR="$(mktemp -d "${TMPDIR:-/tmp}/combine_libs.XXXXXX")"
 else
-  TMP_MRI="${TMPDIR:-/tmp}/combine_libs.$$.$(date +%s).mri"
+  WORKDIR="${TMPDIR:-/tmp}/combine_libs.$$.$(date +%s)"
+  mkdir -p "$WORKDIR"
 fi
 
 cleanup() {
-  rm -f "$TMP_MRI"
+  rm -rf "$WORKDIR"
 }
 trap cleanup EXIT INT TERM
 
-{
-  printf 'CREATE %s\n' "$OUT_ARCHIVE"
-  for lib in "$@"; do
-    printf 'ADDLIB %s\n' "$lib"
-  done
-  printf 'SAVE\n'
-  printf 'END\n'
-} >"$TMP_MRI"
-
-if ! "$AR" -M <"$TMP_MRI" >/dev/null 2>&1; then
-  if command -v libtool >/dev/null 2>&1; then
-    rm -f "$OUT_ARCHIVE"
-    libtool -static -o "$OUT_ARCHIVE" "$@"
-  else
-    echo "combine_libs: '$AR -M' failed and 'libtool' is unavailable." >&2
+for input in "$@"; do
+  INPUT_ABS="$(abspath "$input")"
+  if [ ! -f "$INPUT_ABS" ]; then
+    echo "combine_libs: missing input archive: $input" >&2
     exit 1
   fi
-fi
 
-"$RANLIB" "$OUT_ARCHIVE" >/dev/null 2>&1 || true
+  UNPACK_DIR="$WORKDIR/$(basename "$input")"
+  mkdir -p "$UNPACK_DIR"
+  (
+    cd "$UNPACK_DIR"
+    "${AR:-ar}" x "$INPUT_ABS"
+  )
+done
+
+cd "$WORKDIR" >/dev/null
+apple_symdef_fix
+
+# Keep the default "u" in ARFLAGS for compatibility with upstream makefiles.
+# GNU ar prints a warning that "u" is ignored with deterministic mode, but
+# still succeeds.
+"${AR:-ar}" "${ARFLAGS:-cru}" library.tmp.a ./*/*
+"${RANLIB:-ranlib}" library.tmp.a
+mv -f library.tmp.a "$TARGET"
