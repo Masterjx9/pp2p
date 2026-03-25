@@ -1,7 +1,9 @@
 #!/bin/sh
 
 if command -v autoreconf; then
-  opt="-i -f -W all,error"
+  # Newer autoconf versions (e.g. 2.73) emit warnings for legacy macros in
+  # Tor's configure.ac; treating warnings as errors breaks CI bootstrap.
+  opt="-i -f -W all"
 
   for i in "$@"; do
     case "$i" in
