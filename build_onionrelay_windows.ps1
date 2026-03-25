@@ -114,6 +114,16 @@ cd "__SRC_DIR__"
 make distclean >/dev/null 2>&1 || true
 chmod +x ./scripts/build/combine_libs || true
 
+# Normalize line endings on autotools sources in case Windows checkout
+# introduced CRLF. CRLF in these files can produce malformed configure output.
+find . -type f \( \
+  -name '*.ac' -o \
+  -name '*.am' -o \
+  -name '*.m4' -o \
+  -name '*.in' -o \
+  -name '*.sh' \
+\) -exec sed -i 's/\r$//' {} + || true
+
 # In CI we always regenerate configure to avoid stale/broken snapshots.
 if [[ -n "${GITHUB_ACTIONS:-}" ]]; then
   rm -f ./configure
@@ -134,6 +144,8 @@ if [[ ! -f "./configure" ]]; then
 fi
 chmod +x ./configure
 sed -i 's/\r$//' ./configure || true
+export CONFIG_SHELL=/usr/bin/bash
+export SHELL=/usr/bin/bash
 
 bash ./configure \
   --disable-asciidoc \
