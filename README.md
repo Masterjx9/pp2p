@@ -1,4 +1,4 @@
-# P4 (Persistent Point-to-Point Protocol)
+﻿# P4 (Persistent Point-to-Point Protocol)
 
 P4 keeps normal point-to-point data paths (WebRTC/DataChannel) and adds persistent rendezvous for rediscovery and automatic reconnect after disconnects.
 
@@ -23,6 +23,33 @@ Example use cases:
 - Local-first databases (CRDT peer sync)
 - Encrypted chat without central servers
 - Dev tools: logs/metrics between local machines
+
+## Onion Relay Scope and Safety
+
+- P4 uses OnionRelay only for peer rediscovery/rendezvous signaling when reconnecting.
+- P4 does not route normal application payload traffic through relays; data stays on direct peer-to-peer channels whenever possible.
+- The relay ecosystem is community-operated and decentralized.
+- This project is for legitimate privacy-preserving communication and local-first sync use cases.
+- This project is not for botnets, command-and-control, malware operations, abuse automation, unauthorized access, or any other nefarious activity.
+
+If you want to support the onion relay ecosystem, you can run your own relay: https://community.torproject.org/relay/
+
+`onionrelay_src` is built for this project with a minimal runtime configuration. The build disables non-required components with:
+- `--disable-module-relay`
+- `--disable-module-dirauth`
+- `--disable-module-pow`
+- `--disable-unittests`
+
+This is important because:
+- It only includes the onion relay functionality needed for P4's use case.
+- It minimizes the attack surface of the relay component used by P4.
+- It reduces binary/runtime footprint and keeps packaging lighter across SDKs.
+- It lowers operational complexity by removing features not required for rendezvous signaling.
+
+This is important because:
+- It only includes the onion relay functionality needed for P4's use case.
+- It minimizes the attack surface of the relay component used by P4.
+
 
 ## What Is Supported
 
